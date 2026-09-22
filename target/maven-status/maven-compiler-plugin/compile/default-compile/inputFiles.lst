@@ -1,3 +1,4 @@
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\config\SecurityConfig.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\AforoRestController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\AuthController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\CamaraController.java
@@ -26,6 +27,7 @@ C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\e
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\entity\MovimientoAforo.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\entity\RolPersonal.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\entity\Turno.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\entity\Usuario.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\exception\GlobalExceptionHandler.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\model\Alerta.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\model\Prioridad.java
@@ -40,6 +42,7 @@ C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\r
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\repository\MovimientoAforoRepository.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\repository\RolPersonalRepository.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\repository\TurnoRepository.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\repository\UsuarioRepository.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\SentinelMineApplication.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\AforoService.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\AlertaService.java

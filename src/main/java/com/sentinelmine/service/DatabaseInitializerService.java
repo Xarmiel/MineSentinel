@@ -8,16 +8,18 @@ import com.sentinelmine.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Inicializador de datos de catálogo y estado inicial en Supabase/PostgreSQL.
- * Garantiza que la aplicación arranque con datos válidos de turnos, EPP, anomalías y roles.
+ * Garantiza que la aplicación arranque con datos válidos de turnos, EPP, anomalías, roles y usuarios.
  */
 @Service
 public class DatabaseInitializerService implements CommandLineRunner {
@@ -32,6 +34,8 @@ public class DatabaseInitializerService implements CommandLineRunner {
     private final MovimientoAforoRepository movimientoAforoRepository;
     private final FaltaEPPRepository faltaEPPRepository;
     private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public DatabaseInitializerService(RolPersonalRepository rolPersonalRepository,
                                       TurnoRepository turnoRepository,
@@ -40,7 +44,9 @@ public class DatabaseInitializerService implements CommandLineRunner {
                                       EventoTurnoRepository eventoTurnoRepository,
                                       MovimientoAforoRepository movimientoAforoRepository,
                                       FaltaEPPRepository faltaEPPRepository,
-                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository) {
+                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository,
+                                      UsuarioRepository usuarioRepository,
+                                      PasswordEncoder passwordEncoder) {
         this.rolPersonalRepository = rolPersonalRepository;
         this.turnoRepository = turnoRepository;
         this.catalogoEPPRepository = catalogoEPPRepository;
@@ -49,6 +55,8 @@ public class DatabaseInitializerService implements CommandLineRunner {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -56,6 +64,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
     public void run(String... args) {
         try {
             log.info("Verificando catálogos y estado inicial en base de datos...");
+            inicializarUsuarios();
             inicializarRoles();
             inicializarTurnos();
             inicializarCatalogoEPP();
@@ -64,6 +73,30 @@ public class DatabaseInitializerService implements CommandLineRunner {
             log.info("Inicialización de datos completada.");
         } catch (Exception e) {
             log.warn("Aviso en inicialización de base de datos (las tablas pueden ya existir o requerir conexión activa): {}", e.getMessage());
+        }
+    }
+
+    private void inicializarUsuarios() {
+        Optional<Usuario> adminOpt = usuarioRepository.findByUsername("admin");
+        if (adminOpt.isEmpty()) {
+            Usuario admin = new Usuario(
+                    "admin",
+                    passwordEncoder.encode("sentinel123"),
+                    "Administrador del Sistema",
+                    "ADMIN",
+                    true
+            );
+            usuarioRepository.save(admin);
+            log.info("Usuario administrador por defecto 'admin' creado exitosamente.");
+        } else {
+            Usuario admin = adminOpt.get();
+            if (admin.getEstadoActivo() == null || !admin.getEstadoActivo() || !passwordEncoder.matches("sentinel123", admin.getPassword())) {
+                admin.setPassword(passwordEncoder.encode("sentinel123"));
+                admin.setEstadoActivo(true);
+                admin.setNombreCompleto("Administrador del Sistema");
+                usuarioRepository.save(admin);
+                log.info("Credenciales del usuario 'admin' actualizadas a 'sentinel123'.");
+            }
         }
     }
 

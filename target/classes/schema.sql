@@ -86,6 +86,17 @@ CREATE TABLE IF NOT EXISTS cierres_auditoria_turno (
     fecha_hora TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 10. Usuarios (Gestión de credenciales administrativas y operadores)
+CREATE TABLE IF NOT EXISTS usuarios (
+    usuario_id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    nombre_completo VARCHAR(150),
+    rol VARCHAR(50) NOT NULL DEFAULT 'ADMIN',
+    estado_activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- =============================================================================
 -- ÍNDICES ESTRATÉGICOS PARA ALTA VELOCIDAD DE CONSULTA Y AGREGACIONES
 -- =============================================================================
@@ -94,6 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_movimientos_evento_tipo ON movimientos_aforo(even
 CREATE INDEX IF NOT EXISTS idx_movimientos_fecha_hora ON movimientos_aforo(fecha_hora DESC);
 CREATE INDEX IF NOT EXISTS idx_faltas_epp_evento ON faltas_epp(evento_id);
 CREATE INDEX IF NOT EXISTS idx_anomalias_evento ON anomalias_movimiento(evento_id);
+CREATE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username);
 
 -- =============================================================================
 -- DATOS SEMILLA (CATÁLOGOS BASE)
