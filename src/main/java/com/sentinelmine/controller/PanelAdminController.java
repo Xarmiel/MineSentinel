@@ -2,6 +2,7 @@ package com.sentinelmine.controller;
 
 import com.sentinelmine.service.AforoService;
 import com.sentinelmine.service.AlertaService;
+import com.sentinelmine.service.EventoTurnoService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,10 +15,14 @@ public class PanelAdminController {
 
     private final AforoService aforoService;
     private final AlertaService alertaService;
+    private final EventoTurnoService eventoTurnoService;
 
-    public PanelAdminController(AforoService aforoService, AlertaService alertaService) {
+    public PanelAdminController(AforoService aforoService,
+                                AlertaService alertaService,
+                                EventoTurnoService eventoTurnoService) {
         this.aforoService = aforoService;
         this.alertaService = alertaService;
+        this.eventoTurnoService = eventoTurnoService;
     }
 
     @GetMapping("/panel-admin")
@@ -25,14 +30,14 @@ public class PanelAdminController {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        model.addAttribute("turno", session.getAttribute("turno"));
+        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
         model.addAttribute("aforo", aforoService.toDTO());
         model.addAttribute("alertas", alertaService.getAlertasRecientes(5));
         return "panel-admin";
     }
 
     @PostMapping("/panel-admin/notificar")
-    public String notificarJefeTurno(@RequestParam int idAlerta, HttpSession session) {
+    public String notificarJefeTurno(@RequestParam long idAlerta, HttpSession session) {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }

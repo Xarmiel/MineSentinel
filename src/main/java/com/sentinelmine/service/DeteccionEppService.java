@@ -1,31 +1,43 @@
 package com.sentinelmine.service;
 
+import com.sentinelmine.entity.CatalogoEPP;
+import com.sentinelmine.repository.CatalogoEPPRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
 
 /**
- * Simula la inferencia del modelo YOLOv8 sobre un frame de cámara.
- * En producción, este servicio se conecta al motor de inferencia real
- * (ONNX Runtime / servidor de modelos) en lugar de generar un resultado aleatorio.
+ * Servicio de detección de EPP conectado con el catálogo relacional de la base de datos.
+ * Simula y procesa la inferencia del modelo YOLOv8 sobre un frame de cámara.
  */
 @Service
 public class DeteccionEppService {
 
-    private static final List<String> ELEMENTOS_EPP =
-            List.of("Casco", "Chaleco reflectante", "Botas de seguridad", "Barbiquejo");
-
+    private final CatalogoEPPRepository catalogoEPPRepository;
     private final Random random = new Random();
 
+    public DeteccionEppService(CatalogoEPPRepository catalogoEPPRepository) {
+        this.catalogoEPPRepository = catalogoEPPRepository;
+    }
+
     public ResultadoDeteccion analizarFrame(String trabajadorCodigo) {
-        boolean eppCompleto = random.nextInt(100) > 25; // 75% de probabilidad de cumplir
-        String elementoFaltante = eppCompleto ? null : ELEMENTOS_EPP.get(random.nextInt(ELEMENTOS_EPP.size()));
+        List<CatalogoEPP> listaEpp = catalogoEPPRepository.findAll();
+        boolean eppCompleto = random.nextInt(100) > 25; // 75% probabilidad de cumplimiento en simulación
+
+        String elementoFaltante = null;
+        if (!eppCompleto) {
+            if (!listaEpp.isEmpty()) {
+                elementoFaltante = listaEpp.get(random.nextInt(listaEpp.size())).getNombre();
+            } else {
+                elementoFaltante = "Casco de Seguridad con Barbiquejo";
+            }
+        }
+
         return new ResultadoDeteccion(trabajadorCodigo, eppCompleto, elementoFaltante);
     }
 
     public static class ResultadoDeteccion {
-
         private final String trabajadorCodigo;
         private final boolean eppCompleto;
         private final String elementoFaltante;

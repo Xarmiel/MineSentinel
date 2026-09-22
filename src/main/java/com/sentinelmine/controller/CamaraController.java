@@ -5,6 +5,7 @@ import com.sentinelmine.model.TipoAlerta;
 import com.sentinelmine.service.AforoService;
 import com.sentinelmine.service.AlertaService;
 import com.sentinelmine.service.DeteccionEppService;
+import com.sentinelmine.service.EventoTurnoService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,11 +19,16 @@ public class CamaraController {
     private final DeteccionEppService deteccionService;
     private final AforoService aforoService;
     private final AlertaService alertaService;
+    private final EventoTurnoService eventoTurnoService;
 
-    public CamaraController(DeteccionEppService deteccionService, AforoService aforoService, AlertaService alertaService) {
+    public CamaraController(DeteccionEppService deteccionService,
+                            AforoService aforoService,
+                            AlertaService alertaService,
+                            EventoTurnoService eventoTurnoService) {
         this.deteccionService = deteccionService;
         this.aforoService = aforoService;
         this.alertaService = alertaService;
+        this.eventoTurnoService = eventoTurnoService;
     }
 
     @GetMapping("/camara")
@@ -30,7 +36,7 @@ public class CamaraController {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        model.addAttribute("turno", session.getAttribute("turno"));
+        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
         return "camara";
     }
 
@@ -50,7 +56,7 @@ public class CamaraController {
                     "Sin " + resultado.getElementoFaltante() + " en el punto de control de ingreso.", Prioridad.MEDIA);
         }
 
-        model.addAttribute("turno", session.getAttribute("turno"));
+        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
         model.addAttribute("resultado", resultado);
         return "camara";
     }

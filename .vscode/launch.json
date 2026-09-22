@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "java",
+            "name": "SentinelMineApplication",
+            "request": "launch",
+            "mainClass": "com.sentinelmine.SentinelMineApplication",
+            "projectName": "mine-sentinel-prototype"
+        },
+        {
             "type": "editor-browser",
             "request": "launch",
             "name": "Open panel-admin.html",
