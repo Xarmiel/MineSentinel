@@ -9,10 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.awt.Desktop;
 import java.net.URI;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Componente que abre automáticamente el navegador web predeterminado
- * con la URL de la aplicación una vez que Spring Boot ha arrancado satisfactoriamente.
+ * Servicio de apertura automática del navegador web al iniciar Spring Boot.
  */
 @Service
 public class BrowserLauncherService {
@@ -28,42 +28,60 @@ public class BrowserLauncherService {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         if (!autoLaunch) {
-            log.info("Lanzamiento automático de navegador deshabilitado por configuración.");
             return;
         }
 
         String url = "http://localhost:" + serverPort;
         log.info("====================================================================");
-        log.info("🚀 MineSentinel iniciado correctamente.");
+        log.info("🚀 MineSentinel iniciado.");
         log.info("🌐 Abriendo interfaz de usuario en: {}", url);
         log.info("====================================================================");
 
-        try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(new URI(url));
-                log.info("✅ Navegador abierto exitosamente mediante java.awt.Desktop");
-            } else {
-                abrirNavegadorPorComando(url);
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(1000);
+                abrirNavegador(url);
+            } catch (Exception e) {
+                log.warn("Aviso en lanzamiento de navegador: {}", e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("No se pudo abrir vía java.awt.Desktop ({}), intentando fallback por comando de SO...", e.getMessage());
-            abrirNavegadorPorComando(url);
-        }
+        });
     }
 
-    private void abrirNavegadorPorComando(String url) {
+    private void abrirNavegador(String url) {
         String os = System.getProperty("os.name", "").toLowerCase();
+
+        // 1. En Windows, ejecutar comando de sistema nativo (100% confiable)
+        if (os.contains("win")) {
+            try {
+                new ProcessBuilder("cmd", "/c", "start", url).start();
+                log.info("✅ Navegador abierto exitosamente.");
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 2. Intento mediante Desktop API
+        try {
+            if (!java.awt.GraphicsEnvironment.isHeadless() &&
+                Desktop.isDesktopSupported() &&
+                Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new URI(url));
+                return;
+            }
+        } catch (Exception ignored) {
+        }
+
+        // 3. Fallbacks alternativos
         try {
             if (os.contains("win")) {
-                Runtime.getRuntime().exec(new String[]{"rundll32", "url.dll,FileProtocolHandler", url});
+                new ProcessBuilder("powershell", "-Command", "Start-Process '" + url + "'").start();
             } else if (os.contains("mac")) {
-                Runtime.getRuntime().exec(new String[]{"open", url});
+                new ProcessBuilder("open", url).start();
             } else if (os.contains("nix") || os.contains("nux")) {
-                Runtime.getRuntime().exec(new String[]{"xdg-open", url});
+                new ProcessBuilder("xdg-open", url).start();
             }
-            log.info("✅ Navegador abierto mediante comando del sistema operativo.");
         } catch (Exception ex) {
-            log.error("❌ No fue posible abrir el navegador automáticamente: {}", ex.getMessage());
+            log.warn("No se pudo abrir automáticamente el navegador: {}", ex.getMessage());
         }
     }
 }

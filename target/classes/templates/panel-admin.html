@@ -45,6 +45,7 @@
             </div>
             <form method="post" th:action="@{/panel-admin/notificar}">
                 <input type="hidden" name="idAlerta" th:value="${a.id}">
+                <input type="hidden" name="tipoAlerta" th:value="${a.tipo}">
                 <button type="submit" th:disabled="${a.notificadoJefeTurno}"
                         th:text="${a.notificadoJefeTurno} ? '✔ Jefe de turno notificado' : '📨 Notificar al Jefe de Turno'">
                 </button>

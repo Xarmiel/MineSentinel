@@ -37,11 +37,13 @@ public class PanelAdminController {
     }
 
     @PostMapping("/panel-admin/notificar")
-    public String notificarJefeTurno(@RequestParam long idAlerta, HttpSession session) {
+    public String notificarJefeTurno(@RequestParam long idAlerta,
+                                     @RequestParam(required = false, defaultValue = "EPP") String tipoAlerta,
+                                     HttpSession session) {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        alertaService.notificarJefeTurno(idAlerta);
+        alertaService.notificarJefeTurno(idAlerta, tipoAlerta);
         return "redirect:/panel-admin";
     }
 }

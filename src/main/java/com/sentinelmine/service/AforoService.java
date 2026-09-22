@@ -21,7 +21,7 @@ import java.util.List;
 
 /**
  * Servicio de aforo conectado a base de datos relacional PostgreSQL / Supabase.
- * Provee conteo de aforo dinámico y alimenta las vistas web de Thymeleaf.
+ * Implementa el patrón Append-Only Event Ledger libre de cuellos de botella de concurrencia.
  */
 @Service
 public class AforoService {
@@ -36,7 +36,7 @@ public class AforoService {
     @Value("${minesentinel.aforo.minimo:10}")
     private int aforoMinimo;
 
-    private String ultimoEvento = "20:18:11 - Ingreso bloqueado — Trabajador #16, EPP incompleto";
+    private volatile String ultimoEvento = "20:18:11 - Ingreso bloqueado — Trabajador #16, EPP incompleto";
 
     public AforoService(MovimientoAforoRepository movimientoAforoRepository,
                         EventoTurnoRepository eventoTurnoRepository,
@@ -46,8 +46,12 @@ public class AforoService {
         this.rolPersonalRepository = rolPersonalRepository;
     }
 
+    /**
+     * Registra el ingreso de un trabajador en tiempo real.
+     * Operación transaccional libre de bloqueos de exclusión mutua global.
+     */
     @Transactional
-    public synchronized boolean registrarIngreso(String codigoTrabajador, boolean eppCompleto) {
+    public boolean registrarIngreso(String codigoTrabajador, boolean eppCompleto) {
         if (!eppCompleto) {
             ultimoEvento = String.format("%s - Ingreso bloqueado — Trabajador #%s, EPP incompleto",
                     horaActual(), codigoTrabajador);
@@ -71,8 +75,11 @@ public class AforoService {
         return true;
     }
 
+    /**
+     * Registra la salida de un trabajador en tiempo real.
+     */
     @Transactional
-    public synchronized void registrarSalida() {
+    public void registrarSalida() {
         int aforoActual = getAforoActual();
         if (aforoActual > 0) {
             EventoTurno evento = obtenerOcrearEventoActivo();
@@ -96,7 +103,8 @@ public class AforoService {
     }
 
     private EventoTurno obtenerOcrearEventoActivo() {
-        List<EventoTurno> activos = eventoTurnoRepository.findByEstado(EstadoTurno.ACTIVO);
+        // En caso de solapamiento, se selecciona la guardia activa más reciente para nuevos ingresos
+        List<EventoTurno> activos = eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
         if (!activos.isEmpty()) {
             return activos.get(0);
         }
@@ -111,7 +119,7 @@ public class AforoService {
 
     private RolPersonal obtenerRolDefault() {
         return rolPersonalRepository.findAll().stream().findFirst()
-                .orElseGet(() -> rolPersonalRepository.save(new RolPersonal("Operador General", "Amarillo", true)));
+                .orElseGet(() -> rolPersonalRepository.save(new RolPersonal("Operador de Maquinaria / Perforista", "Amarillo", true)));
     }
 
     private String horaActual() {
@@ -136,7 +144,6 @@ public class AforoService {
         int porcentaje = getPorcentajeCapacidad();
         String estado = getEstadoAforo();
 
-        // Si hay movimientos recientes en base de datos, sincronizamos la descripción del último evento
         try {
             List<MovimientoAforo> ultimos = movimientoAforoRepository.findUltimosMovimientos(PageRequest.of(0, 1));
             if (!ultimos.isEmpty()) {

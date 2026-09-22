@@ -11,6 +11,8 @@ import com.sentinelmine.entity.enums.EstadoTurno;
 import com.sentinelmine.model.Prioridad;
 import com.sentinelmine.model.TipoAlerta;
 import com.sentinelmine.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +25,12 @@ import java.util.List;
 
 /**
  * Servicio de alertas conectado a las tablas normalizadas `faltas_epp` y `anomalias_movimiento`.
- * Provee la información para el dashboard, panel de administración e historial.
+ * Resuelve colisiones de claves primarias mediante identificación tipada de alertas.
  */
 @Service
 public class AlertaService {
+
+    private static final Logger log = LoggerFactory.getLogger(AlertaService.class);
 
     private final FaltaEPPRepository faltaEPPRepository;
     private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
@@ -53,7 +57,7 @@ public class AlertaService {
 
         if (tipo == TipoAlerta.EPP_INCOMPLETO) {
             CatalogoEPP epp = catalogoEPPRepository.findAll().stream().findFirst()
-                    .orElseGet(() -> catalogoEPPRepository.save(new CatalogoEPP("Casco de Seguridad")));
+                    .orElseGet(() -> catalogoEPPRepository.save(new CatalogoEPP("Casco de Seguridad con Barbiquejo")));
 
             FaltaEPP falta = new FaltaEPP(
                     evento,
@@ -65,6 +69,7 @@ public class AlertaService {
                     LocalDateTime.now()
             );
             faltaEPPRepository.save(falta);
+            log.info("Falta de EPP registrada para trabajador #{}: {}", trabajadorCodigo, descripcion);
         }
     }
 
@@ -85,13 +90,14 @@ public class AlertaService {
         for (FaltaEPP f : faltas) {
             String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
+            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Operador";
             String codTrabajador = f.getFaltaId() != null ? String.valueOf(10 + (f.getFaltaId() % 90)) : "16";
             boolean notificado = f.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || f.getEstadoAlerta() == EstadoAlerta.REVISADA;
 
             resultado.add(new AlertaViewDTO(
                     f.getFaltaId(),
                     "EPP",
-                    "Infracción de EPP detectada",
+                    "Infracción de EPP detectada (" + rolNombre + ")",
                     hora,
                     "Sin " + eppNombre + " en el punto de control de ingreso.",
                     codTrabajador,
@@ -129,23 +135,37 @@ public class AlertaService {
         return resultado;
     }
 
+    /**
+     * Notifica al jefe de turno disambiguando el tipo de alerta ("EPP" vs "ANOMALIA")
+     * para evitar colisiones entre claves primarias independientes.
+     */
     @Transactional
-    public void notificarJefeTurno(long idAlerta) {
-        // Intenta actualizar en faltas_epp
-        faltaEPPRepository.findById(idAlerta).ifPresentOrElse(falta -> {
-            falta.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
-            faltaEPPRepository.save(falta);
-        }, () -> {
-            // Si no está en faltas_epp, buscar en anomalias_movimiento
+    public void notificarJefeTurno(long idAlerta, String tipoAlerta) {
+        if ("ANOMALIA".equalsIgnoreCase(tipoAlerta)) {
             anomaliaMovimientoRepository.findById(idAlerta).ifPresent(anomalia -> {
                 anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                 anomaliaMovimientoRepository.save(anomalia);
+                log.info("Anomalía #{} marcada como NOTIFICADA.", idAlerta);
             });
-        });
+        } else {
+            // Por defecto o si es EPP
+            faltaEPPRepository.findById(idAlerta).ifPresentOrElse(falta -> {
+                falta.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
+                faltaEPPRepository.save(falta);
+                log.info("Falta de EPP #{} marcada como NOTIFICADA.", idAlerta);
+            }, () -> {
+                // Fallback de búsqueda cruzada si el tipo no coincidiera
+                anomaliaMovimientoRepository.findById(idAlerta).ifPresent(anomalia -> {
+                    anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
+                    anomaliaMovimientoRepository.save(anomalia);
+                    log.info("Anomalía #{} marcada como NOTIFICADA (fallback).", idAlerta);
+                });
+            });
+        }
     }
 
     private EventoTurno obtenerOcrearEventoActivo() {
-        List<EventoTurno> activos = eventoTurnoRepository.findByEstado(EstadoTurno.ACTIVO);
+        List<EventoTurno> activos = eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
         if (!activos.isEmpty()) {
             return activos.get(0);
         }
