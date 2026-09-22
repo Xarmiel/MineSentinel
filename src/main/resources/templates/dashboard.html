@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>SentinelMine · Centro de Control</title>
+    <link rel="stylesheet" th:href="../static/css/style.css">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: nav(${turno})}"></div>
+
+<main class="content">
+    <section class="camera-card">
+    <video id="videoCamara" autoplay playsinline class="camera-feed" style="display:none;"></video>
+    <div class="camera-placeholder" id="placeholderCamara">
+        <span class="camera-icon">📷</span>
+        <p>Activa la cámara para iniciar el monitoreo del punto de control.</p>
+        <p class="small">El vídeo se procesa localmente en el navegador.</p>
+        <button type="button" id="btnActivarCamara" class="btn-camara">Activar cámara</button>
+    </div>
+</section>
+
+    <div>
+        <section class="aforo-card">
+            <div class="card-header">
+                <h3>Control de Aforo</h3>
+                <span class="badge badge-success" th:text="${aforo.estado}">AFORO NORMAL</span>
+            </div>
+            <div class="aforo-numbers">
+                <div><span class="num num-green" th:text="${aforo.actual}">42</span><small>AFORO ACTUAL</small></div>
+                <div><span class="num" th:text="${aforo.maximo}">50</span><small>MÁX. PERMITIDO</small></div>
+                <div><span class="num" th:text="${aforo.minimo}">10</span><small>MÍNIMO</small></div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" th:style="'width:' + ${aforo.porcentaje} + '%'"></div>
+            </div>
+            <p class="progress-label" th:text="${aforo.porcentaje} + '% de capacidad'">84% de capacidad</p>
+            <p class="ultimo-evento">Último cruce de línea virtual<br><span th:text="${aforo.ultimoEvento}"></span></p>
+        </section>
+
+        <section class="alertas-card">
+            <div class="card-header">
+                <h3>Alertas Recientes</h3>
+                <span class="badge" th:text="${#lists.size(alertas)} + ' eventos'">1 eventos</span>
+            </div>
+            <div class="alerta" th:each="a : ${alertas}" th:classappend="${a.prioridadAlta} ? 'alerta-alta' : ''">
+                <div class="alerta-header">
+                    <strong th:text="${a.tituloVisual}">Infracción de EPP detectada</strong>
+                    <span class="hora" th:text="${a.horaFormateada}"></span>
+                </div>
+                <p th:text="${a.descripcion}"></p>
+                <div class="alerta-footer">
+                    <span class="tag" th:text="'TRABAJADOR #' + ${a.trabajadorCodigo}"></span>
+                    <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : 'tag-media'"
+                          th:text="'Prioridad ' + ${a.prioridadTexto}"></span>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+<script>
+    const btnActivarCamara = document.getElementById('btnActivarCamara');
+    const videoCamara = document.getElementById('videoCamara');
+    const placeholderCamara = document.getElementById('placeholderCamara');
+
+    if (btnActivarCamara) {
+        btnActivarCamara.addEventListener('click', async () => {
+            if (videoCamara.srcObject) return; // ya está activa
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                videoCamara.srcObject = stream;
+                videoCamara.style.display = 'block';
+                placeholderCamara.style.display = 'none';
+            } catch (err) {
+                alert('No se pudo acceder a la cámara: ' + err.message);
+            }
+        });
+    }
+</script>
+</body>
+</html>

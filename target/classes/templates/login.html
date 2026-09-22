@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Mine's Sentinel · Acceso</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body class="login-body">
+<div class="login-card">
+    <div class="brand">
+        <span class="brand-icon">⛑</span>
+        <h1>SentinelMine</h1>
+    </div>
+    <p class="subtitle">Seguridad minera y control de EPP en tiempo real</p>
+    <form method="post" th:action="@{/login}">
+        <label>Usuario</label>
+        <input type="text" name="usuario" placeholder="admin" required>
+        <label>Contraseña</label>
+        <input type="password" name="password" placeholder="••••••••" required>
+        <p class="error" th:if="${error}" th:text="${error}"></p>
+        <button type="submit">Ingresar</button>
+    </form>
+    <p class="hint">Demo: admin / sentinel123</p>
+</div>
+</body>
+</html>

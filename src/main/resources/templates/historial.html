@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>SentinelMine · Historial de Alertas</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: nav(${turno})}"></div>
+
+<main class="content-single">
+    <h2 class="section-title">Historial de Alertas</h2>
+    <table class="tabla-historial">
+        <thead>
+        <tr>
+            <th>#</th>
+            <th>Hora</th>
+            <th>Tipo</th>
+            <th>Trabajador</th>
+            <th>Descripción</th>
+            <th>Prioridad</th>
+            <th>Notificado</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="a : ${historial}">
+            <td th:text="${a.id}"></td>
+            <td th:text="${a.horaFormateada}"></td>
+            <td th:text="${a.tituloVisual}"></td>
+            <td th:text="'#' + ${a.trabajadorCodigo}"></td>
+            <td th:text="${a.descripcion}"></td>
+            <td th:text="${a.prioridadTexto}"></td>
+            <td th:text="${a.notificadoJefeTurno} ? 'Sí' : 'No'"></td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

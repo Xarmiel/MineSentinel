@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<header class="topbar" th:fragment="nav(turno)">
+    <div class="topbar-left">
+        <span class="brand-icon">⛑</span>
+        <div>
+            <strong>SentinelMine · Centro de Control</strong>
+            <div class="subtitle-small">SEGURIDAD MINERA Y CONTROL DE EPP EN TIEMPO REAL</div>
+        </div>
+    </div>
+    <nav class="topbar-nav">
+        <a th:href="@{/}">Dashboard</a>
+        <a th:href="@{/camara}">Cámara</a>
+        <a th:href="@{/panel-admin}">Panel Admin</a>
+        <a th:href="@{/historial}">Historial</a>
+        <a th:href="@{/logout}">Salir</a>
+    </nav>
+    <div class="topbar-status">
+        <span class="pill" th:text="${turno}">Turno A · Guardia Noche</span>
+        <span class="pill pill-warning">Analítica IA en pausa</span>
+        <span class="pill pill-success">Sistema operativo</span>
+    </div>
+</header>
+</body>
+</html>
