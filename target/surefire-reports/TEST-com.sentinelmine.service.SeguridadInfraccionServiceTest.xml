@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sentinelmine.service.EventoTurnoServiceTest" time="1.638" tests="8" errors="0" skipped="0" failures="0" flakes="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.sentinelmine.service.SeguridadInfraccionServiceTest" time="0.251" tests="4" errors="0" skipped="0" failures="0" flakes="0">
   <properties>
     <property name="java.specification.version" value="26"/>
     <property name="sun.cpu.isalist" value="amd64"/>
@@ -60,26 +60,8 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="70.0"/>
   </properties>
-  <testcase name="testCerrarTurnoConsolidaSoloRolesConRequiereAforo" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="1.557">
-    <system-out><![CDATA[19:41:00.141 [main] INFO com.sentinelmine.service.EventoTurnoService -- Evento de turno #50 cerrado exitosamente. Auditoría #1001 generada (Entradas: 40, Salidas: 38, Diferencia: 2)
-]]></system-out>
-    <system-err><![CDATA[WARNING: A Java agent has been loaded dynamically (C:\Users\ramir\.m2\repository\net\bytebuddy\byte-buddy-agent\1.14.19\byte-buddy-agent-1.14.19.jar)
-WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
-WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
-WARNING: Dynamic loading of agents will be disallowed by default in a future release
-]]></system-err>
-  </testcase>
-  <testcase name="testCerrarTurnoNoActivoLanzaExcepcion" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.008"/>
-  <testcase name="testAbrirTurnoInexistenteLanzaExcepcion" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.007"/>
-  <testcase name="testHaySolapamientoTurnos" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.006"/>
-  <testcase name="testResolverEventoActivoDuranteSolapamiento" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.005"/>
-  <testcase name="testCerrarTurnoConAuditoriaPreviaLanzaExcepcion" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.006"/>
-  <testcase name="testAbrirTurnoExitoso" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.008">
-    <system-out><![CDATA[19:41:00.207 [main] INFO com.sentinelmine.service.EventoTurnoService -- Turno operativo abierto exitosamente: #10 - 'Turno Guardia Día' (Inicio: 2026-09-24T07:00)
-]]></system-out>
-  </testcase>
-  <testcase name="testCerrarTurnoBalanceCuadrado" classname="com.sentinelmine.service.EventoTurnoServiceTest" time="0.006">
-    <system-out><![CDATA[19:41:00.215 [main] INFO com.sentinelmine.service.EventoTurnoService -- Evento de turno #51 cerrado exitosamente. Auditoría #1002 generada (Entradas: 50, Salidas: 50, Diferencia: 0)
-]]></system-out>
-  </testcase>
+  <testcase name="testRegistrarFaltaEPPResolucionAutomaticaTurno" classname="com.sentinelmine.service.SeguridadInfraccionServiceTest" time="0.223"/>
+  <testcase name="testRegistrarAnomaliaMovimiento" classname="com.sentinelmine.service.SeguridadInfraccionServiceTest" time="0.009"/>
+  <testcase name="testCambiarEstadoFaltaEPP" classname="com.sentinelmine.service.SeguridadInfraccionServiceTest" time="0.005"/>
+  <testcase name="testRegistrarFaltaEPPConEventoExplicito" classname="com.sentinelmine.service.SeguridadInfraccionServiceTest" time="0.005"/>
 </testsuite>
