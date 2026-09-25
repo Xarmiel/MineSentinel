@@ -28,4 +28,12 @@ public interface EventoTurnoRepository extends JpaRepository<EventoTurno, Long> 
     Optional<EventoTurno> findFirstByTurno_TurnoIdAndEstado(Long turnoId, EstadoTurno estado);
 
     boolean existsByTurno_TurnoIdAndEstado(Long turnoId, EstadoTurno estado);
+
+    List<EventoTurno> findAllByEstadoOrderByFechaInicioAsc(EstadoTurno estado);
+
+    List<EventoTurno> findAllByEstadoOrderByFechaInicioDesc(EstadoTurno estado);
+
+    Optional<EventoTurno> findFirstByEstadoOrderByFechaInicioDesc(EstadoTurno estado);
+
+    Optional<EventoTurno> findFirstByEstadoOrderByFechaInicioAsc(EstadoTurno estado);
 }

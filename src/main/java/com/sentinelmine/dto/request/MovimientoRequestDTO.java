@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
  */
 public class MovimientoRequestDTO {
 
-    @NotNull(message = "El eventoId es obligatorio")
+    // Opcional: Si se omite, el sistema resuelve automáticamente el evento_id activo
+    // según el flujo operativo y el solapamiento de turnos (ENTRADA -> nuevo turno / SALIDA -> turno saliente)
     private Long eventoId;
 
     @NotNull(message = "El rolId es obligatorio")

@@ -32,6 +32,7 @@ public class MovimientoAforoService {
     private final MovimientoAforoRepository movimientoAforoRepository;
     private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
+    private final EventoTurnoService eventoTurnoService;
 
     @Value("${minesentinel.aforo.maximo:50}")
     private int aforoMaximo;
@@ -41,29 +42,40 @@ public class MovimientoAforoService {
 
     public MovimientoAforoService(MovimientoAforoRepository movimientoAforoRepository,
                                   EventoTurnoRepository eventoTurnoRepository,
-                                  RolPersonalRepository rolPersonalRepository) {
+                                  RolPersonalRepository rolPersonalRepository,
+                                  EventoTurnoService eventoTurnoService) {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
+        this.eventoTurnoService = eventoTurnoService;
     }
 
     /**
      * Registra un cruce individual de línea de aforo en la base de datos.
-     * Operación ligera O(1) de inserción libre de locks.
+     * Operación ligera O(1) de inserción bajo el patrón Append-Only Event Ledger libre de locks.
+     * 
+     * Soporta solapamiento de turnos: Si no se especifica eventoId, resuelve automáticamente
+     * el turno activo según el tipo de cruce (ENTRADA -> nueva guardia, SALIDA -> guardia saliente).
      */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MovimientoAforo registrarMovimiento(MovimientoRequestDTO dto) {
-        EventoTurno evento = eventoTurnoRepository.findById(dto.getEventoId())
-                .orElseThrow(() -> new IllegalArgumentException("No existe el evento de turno #" + dto.getEventoId()));
+        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
 
-        if (evento.getEstado() != EstadoTurno.ACTIVO) {
-            throw new IllegalStateException("No se pueden registrar movimientos en un turno inactivo (Estado: " + evento.getEstado() + ")");
+        EventoTurno evento;
+        if (dto.getEventoId() != null) {
+            evento = eventoTurnoRepository.findById(dto.getEventoId())
+                    .orElseThrow(() -> new IllegalArgumentException("No existe el evento de turno #" + dto.getEventoId()));
+
+            if (evento.getEstado() != EstadoTurno.ACTIVO) {
+                throw new IllegalStateException("No se pueden registrar movimientos en un turno inactivo (Estado: " + evento.getEstado() + ")");
+            }
+        } else {
+            // Resolución dinámica e inteligente durante solapamiento de guardias
+            evento = eventoTurnoService.resolverEventoActivoParaMovimiento(fechaHora, dto.getTipoMovimiento());
         }
 
         RolPersonal rol = rolPersonalRepository.findById(dto.getRolId())
                 .orElseThrow(() -> new IllegalArgumentException("No existe el rol con ID #" + dto.getRolId()));
-
-        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
 
         MovimientoAforo movimiento = new MovimientoAforo(evento, rol, dto.getTipoMovimiento(), fechaHora);
         return movimientoAforoRepository.save(movimiento);

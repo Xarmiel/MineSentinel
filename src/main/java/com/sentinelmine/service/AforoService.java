@@ -29,6 +29,7 @@ public class AforoService {
     private final MovimientoAforoRepository movimientoAforoRepository;
     private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
+    private final EventoTurnoService eventoTurnoService;
 
     @Value("${minesentinel.aforo.maximo:50}")
     private int aforoMaximo;
@@ -40,17 +41,19 @@ public class AforoService {
 
     public AforoService(MovimientoAforoRepository movimientoAforoRepository,
                         EventoTurnoRepository eventoTurnoRepository,
-                        RolPersonalRepository rolPersonalRepository) {
+                        RolPersonalRepository rolPersonalRepository,
+                        EventoTurnoService eventoTurnoService) {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
+        this.eventoTurnoService = eventoTurnoService;
     }
 
     /**
      * Registra el ingreso de un trabajador en tiempo real.
      * Operación transaccional libre de bloqueos de exclusión mutua global.
      */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public boolean registrarIngreso(String codigoTrabajador, boolean eppCompleto) {
         if (!eppCompleto) {
             ultimoEvento = String.format("%s - Ingreso bloqueado — Trabajador #%s, EPP incompleto",
@@ -64,10 +67,11 @@ public class AforoService {
             return false;
         }
 
-        EventoTurno evento = obtenerOcrearEventoActivo();
+        LocalDateTime now = LocalDateTime.now();
+        EventoTurno evento = eventoTurnoService.resolverEventoActivoParaMovimiento(now, TipoMovimiento.ENTRADA);
         RolPersonal rol = obtenerRolDefault();
 
-        MovimientoAforo movimiento = new MovimientoAforo(evento, rol, TipoMovimiento.ENTRADA, LocalDateTime.now());
+        MovimientoAforo movimiento = new MovimientoAforo(evento, rol, TipoMovimiento.ENTRADA, now);
         movimientoAforoRepository.save(movimiento);
 
         ultimoEvento = String.format("%s - Ingreso autorizado — Trabajador #%s (%s)",
@@ -78,14 +82,15 @@ public class AforoService {
     /**
      * Registra la salida de un trabajador en tiempo real.
      */
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void registrarSalida() {
         int aforoActual = getAforoActual();
         if (aforoActual > 0) {
-            EventoTurno evento = obtenerOcrearEventoActivo();
+            LocalDateTime now = LocalDateTime.now();
+            EventoTurno evento = eventoTurnoService.resolverEventoActivoParaMovimiento(now, TipoMovimiento.SALIDA);
             RolPersonal rol = obtenerRolDefault();
 
-            MovimientoAforo movimiento = new MovimientoAforo(evento, rol, TipoMovimiento.SALIDA, LocalDateTime.now());
+            MovimientoAforo movimiento = new MovimientoAforo(evento, rol, TipoMovimiento.SALIDA, now);
             movimientoAforoRepository.save(movimiento);
 
             ultimoEvento = String.format("%s - Salida registrada", horaActual());
@@ -100,21 +105,6 @@ public class AforoService {
         } catch (Exception e) {
             return 0;
         }
-    }
-
-    private EventoTurno obtenerOcrearEventoActivo() {
-        // En caso de solapamiento, se selecciona la guardia activa más reciente para nuevos ingresos
-        List<EventoTurno> activos = eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
-        if (!activos.isEmpty()) {
-            return activos.get(0);
-        }
-        return eventoTurnoRepository.findAll().stream().findFirst()
-                .orElseGet(() -> {
-                    EventoTurno nuevo = new EventoTurno();
-                    nuevo.setEstado(EstadoTurno.ACTIVO);
-                    nuevo.setFechaInicio(LocalDateTime.now());
-                    return eventoTurnoRepository.save(nuevo);
-                });
     }
 
     private RolPersonal obtenerRolDefault() {

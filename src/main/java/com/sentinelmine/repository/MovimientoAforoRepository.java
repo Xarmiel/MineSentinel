@@ -19,6 +19,21 @@ public interface MovimientoAforoRepository extends JpaRepository<MovimientoAforo
     long countByEventoTurno_EventoIdAndTipoMovimiento(Long eventoId, TipoMovimiento tipoMovimiento);
 
     /**
+     * Cuenta movimientos de un tipo específico para un evento de turno,
+     * filtrando exclusivamente los roles que tienen requiereAforo = true.
+     */
+    long countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(Long eventoId, TipoMovimiento tipoMovimiento);
+
+    /**
+     * Cuenta los movimientos con requiereAforo = true usando consulta explícita JPQL.
+     */
+    @Query("SELECT COUNT(m) FROM MovimientoAforo m " +
+           "WHERE m.eventoTurno.eventoId = :eventoId " +
+           "AND m.tipoMovimiento = :tipoMovimiento " +
+           "AND m.rol.requiereAforo = true")
+    long countMovimientosConAforo(@Param("eventoId") Long eventoId, @Param("tipoMovimiento") TipoMovimiento tipoMovimiento);
+
+    /**
      * Calcula el aforo neto de personal en socavón para un evento de turno específico.
      * Solo considera roles donde requiereAforo = true.
      */
