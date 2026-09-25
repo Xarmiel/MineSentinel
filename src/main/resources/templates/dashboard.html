@@ -124,10 +124,25 @@
                     `).join('');
                 }
             }
-        } catch (e) {
-            console.debug('Error en refresco asíncrono:', e);
+    // Suscripción en tiempo real vía Server-Sent Events (SSE)
+    function iniciarStreamSSE() {
+        if (!!window.EventSource) {
+            const source = new EventSource('/api/v1/stream/eventos');
+            source.addEventListener('aforo-update', (e) => {
+                refrescarDashboard();
+            });
+            source.addEventListener('alerta-nueva', (e) => {
+                refrescarDashboard();
+            });
+            source.addEventListener('turno-update', (e) => {
+                refrescarDashboard();
+            });
+            source.onerror = (e) => {
+                console.debug('Reconectando SSE...');
+            };
         }
     }
+    iniciarStreamSSE();
     setInterval(refrescarDashboard, 3000);
 </script>
 </body>

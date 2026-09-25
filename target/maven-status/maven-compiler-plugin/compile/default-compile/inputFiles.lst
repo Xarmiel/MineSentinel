@@ -1,4 +1,6 @@
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\config\AuthInterceptor.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\config\SecurityConfig.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\config\WebMvcConfig.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\AforoRestController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\AuthController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\CamaraController.java
@@ -6,6 +8,8 @@ C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\c
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\DashboardController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\HistorialController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\PanelAdminController.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\SnapshotRestController.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\controller\StreamRestController.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\dto\AforoDTO.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\dto\AlertaViewDTO.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\dto\request\AnomaliaRequestDTO.java
@@ -51,4 +55,8 @@ C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\s
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\DeteccionEppService.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\EventoTurnoService.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\MovimientoAforoService.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\NotificacionExternaService.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\ReporteExportService.java
 C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\SeguridadInfraccionService.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\SnapshotStorageService.java
+C:\Users\ramir\OneDrive\Escritorio\MineSentinel\src\main\java\com\sentinelmine\service\SseNotificationService.java

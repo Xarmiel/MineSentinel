@@ -9,7 +9,12 @@
 <div th:replace="~{fragments/nav :: nav(${turno})}"></div>
 
 <main class="content-single">
-    <h2 class="section-title">Historial de Alertas</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 class="section-title" style="margin: 0;">Historial de Alertas</h2>
+        <a th:href="@{/historial/exportar/csv}" class="badge badge-success" style="padding: 10px 18px; text-decoration: none; font-size: 13px;">
+            📥 Exportar Historial a CSV (Excel)
+        </a>
+    </div>
     <table class="tabla-historial">
         <thead>
         <tr>

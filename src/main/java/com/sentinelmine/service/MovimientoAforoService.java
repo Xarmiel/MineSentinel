@@ -33,6 +33,7 @@ public class MovimientoAforoService {
     private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
+    private final SseNotificationService sseNotificationService;
 
     @Value("${minesentinel.aforo.maximo:50}")
     private int aforoMaximo;
@@ -43,11 +44,13 @@ public class MovimientoAforoService {
     public MovimientoAforoService(MovimientoAforoRepository movimientoAforoRepository,
                                   EventoTurnoRepository eventoTurnoRepository,
                                   RolPersonalRepository rolPersonalRepository,
-                                  EventoTurnoService eventoTurnoService) {
+                                  EventoTurnoService eventoTurnoService,
+                                  SseNotificationService sseNotificationService) {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
+        this.sseNotificationService = sseNotificationService;
     }
 
     /**
@@ -78,7 +81,16 @@ public class MovimientoAforoService {
                 .orElseThrow(() -> new IllegalArgumentException("No existe el rol con ID #" + dto.getRolId()));
 
         MovimientoAforo movimiento = new MovimientoAforo(evento, rol, dto.getTipoMovimiento(), fechaHora);
-        return movimientoAforoRepository.save(movimiento);
+        MovimientoAforo guardado = movimientoAforoRepository.save(movimiento);
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("aforo-update", obtenerAforoGlobalEnTiempoReal());
+            }
+        } catch (Exception ignored) {
+        }
+
+        return guardado;
     }
 
     /**

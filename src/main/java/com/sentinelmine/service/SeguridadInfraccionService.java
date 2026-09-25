@@ -26,6 +26,8 @@ public class SeguridadInfraccionService {
     private final CatalogoAnomaliasRepository catalogoAnomaliasRepository;
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
+    private final SseNotificationService sseNotificationService;
+    private final NotificacionExternaService notificacionExternaService;
 
     public SeguridadInfraccionService(FaltaEPPRepository faltaEPPRepository,
                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository,
@@ -33,7 +35,9 @@ public class SeguridadInfraccionService {
                                      CatalogoEPPRepository catalogoEPPRepository,
                                      CatalogoAnomaliasRepository catalogoAnomaliasRepository,
                                      RolPersonalRepository rolPersonalRepository,
-                                     EventoTurnoService eventoTurnoService) {
+                                     EventoTurnoService eventoTurnoService,
+                                     SseNotificationService sseNotificationService,
+                                     NotificacionExternaService notificacionExternaService) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
@@ -41,6 +45,8 @@ public class SeguridadInfraccionService {
         this.catalogoAnomaliasRepository = catalogoAnomaliasRepository;
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
+        this.sseNotificationService = sseNotificationService;
+        this.notificacionExternaService = notificacionExternaService;
     }
 
     /**
@@ -76,7 +82,16 @@ public class SeguridadInfraccionService {
                 fechaHora
         );
 
-        return faltaEPPRepository.save(falta);
+        FaltaEPP guardada = faltaEPPRepository.save(falta);
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("alerta-nueva", guardada);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return guardada;
     }
 
     /**
@@ -112,7 +127,16 @@ public class SeguridadInfraccionService {
                 fechaHora
         );
 
-        return anomaliaMovimientoRepository.save(anomalia);
+        AnomaliaMovimiento guardada = anomaliaMovimientoRepository.save(anomalia);
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("alerta-nueva", guardada);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return guardada;
     }
 
     /**

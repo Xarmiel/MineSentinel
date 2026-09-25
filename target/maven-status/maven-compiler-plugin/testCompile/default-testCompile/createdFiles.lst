@@ -1,2 +1,8 @@
-com\sentinelmine\service\MovimientoAforoServiceTest.class
+com\sentinelmine\dto\AforoDTOTest.class
+com\sentinelmine\service\SeguridadInfraccionServiceTest.class
 com\sentinelmine\service\EventoTurnoServiceTest.class
+com\sentinelmine\service\MovimientoAforoServiceTest.class
+com\sentinelmine\service\ReporteExportServiceTest.class
+com\sentinelmine\service\SseNotificationServiceTest.class
+com\sentinelmine\entity\EntityMappingTest.class
+com\sentinelmine\service\SnapshotStorageServiceTest.class

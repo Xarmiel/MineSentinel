@@ -37,17 +37,23 @@ public class AlertaService {
     private final CatalogoEPPRepository catalogoEPPRepository;
     private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
+    private final NotificacionExternaService notificacionExternaService;
+    private final SseNotificationService sseNotificationService;
 
     public AlertaService(FaltaEPPRepository faltaEPPRepository,
                          AnomaliaMovimientoRepository anomaliaMovimientoRepository,
                          CatalogoEPPRepository catalogoEPPRepository,
                          EventoTurnoRepository eventoTurnoRepository,
-                         RolPersonalRepository rolPersonalRepository) {
+                         RolPersonalRepository rolPersonalRepository,
+                         NotificacionExternaService notificacionExternaService,
+                         SseNotificationService sseNotificationService) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
         this.catalogoEPPRepository = catalogoEPPRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
+        this.notificacionExternaService = notificacionExternaService;
+        this.sseNotificationService = sseNotificationService;
     }
 
     @Transactional
@@ -68,8 +74,9 @@ public class AlertaService {
                     EstadoAlerta.PENDIENTE,
                     LocalDateTime.now()
             );
-            faltaEPPRepository.save(falta);
+            FaltaEPP guardada = faltaEPPRepository.save(falta);
             log.info("Falta de EPP registrada para trabajador #{}: {}", trabajadorCodigo, descripcion);
+            sseNotificationService.emitirEvento("alerta-nueva", guardada);
         }
     }
 
@@ -146,6 +153,9 @@ public class AlertaService {
                 anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                 anomaliaMovimientoRepository.save(anomalia);
                 log.info("Anomalía #{} marcada como NOTIFICADA.", idAlerta);
+                String desc = anomalia.getCatalogoAnomalia() != null ? anomalia.getCatalogoAnomalia().getNombre() : "Anomalía postural";
+                notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", desc, "Auto", anomalia.getSnapshotUrl());
+                sseNotificationService.emitirEvento("alerta-actualizada", anomalia);
             });
         } else {
             // Por defecto o si es EPP
@@ -153,12 +163,17 @@ public class AlertaService {
                 falta.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                 faltaEPPRepository.save(falta);
                 log.info("Falta de EPP #{} marcada como NOTIFICADA.", idAlerta);
+                String desc = falta.getEpp() != null ? "Falta de " + falta.getEpp().getNombre() : "Falta de EPP";
+                notificacionExternaService.despacharNotificacionJefeTurno("Infracción de EPP", desc, "Auto", falta.getSnapshotUrl());
+                sseNotificationService.emitirEvento("alerta-actualizada", falta);
             }, () -> {
                 // Fallback de búsqueda cruzada si el tipo no coincidiera
                 anomaliaMovimientoRepository.findById(idAlerta).ifPresent(anomalia -> {
                     anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                     anomaliaMovimientoRepository.save(anomalia);
                     log.info("Anomalía #{} marcada como NOTIFICADA (fallback).", idAlerta);
+                    notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", "Riesgo detectado", "Auto", anomalia.getSnapshotUrl());
+                    sseNotificationService.emitirEvento("alerta-actualizada", anomalia);
                 });
             });
         }

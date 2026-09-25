@@ -37,6 +37,7 @@ public class EventoTurnoService {
     private final TurnoRepository turnoRepository;
     private final MovimientoAforoRepository movimientoAforoRepository;
     private final CierreAuditoriaTurnoRepository cierreAuditoriaTurnoRepository;
+    private SseNotificationService sseNotificationService;
 
     public EventoTurnoService(EventoTurnoRepository eventoTurnoRepository,
                               TurnoRepository turnoRepository,
@@ -46,6 +47,11 @@ public class EventoTurnoService {
         this.turnoRepository = turnoRepository;
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.cierreAuditoriaTurnoRepository = cierreAuditoriaTurnoRepository;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSseNotificationService(SseNotificationService sseNotificationService) {
+        this.sseNotificationService = sseNotificationService;
     }
 
     /**
@@ -69,6 +75,13 @@ public class EventoTurnoService {
         EventoTurno guardado = eventoTurnoRepository.save(nuevoEvento);
         log.info("Turno operativo abierto exitosamente: #{} - '{}' (Inicio: {})",
                 guardado.getEventoId(), turno.getNombre(), inicio);
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("turno-update", guardado);
+            }
+        } catch (Exception ignored) {
+        }
 
         return guardado;
     }
@@ -139,7 +152,7 @@ public class EventoTurnoService {
             mensajeAuditoria = String.format("ADVERTENCIA DE VISIÓN: Se registraron %d salidas adicionales a las entradas del turno.", Math.abs(diferencia));
         }
 
-        return new CierreTurnoResponseDTO(
+        CierreTurnoResponseDTO responseDTO = new CierreTurnoResponseDTO(
                 auditoriaGuardada.getAuditoriaId(),
                 evento.getEventoId(),
                 evento.getTurno().getNombre(),
@@ -149,6 +162,15 @@ public class EventoTurnoService {
                 fechaCierre,
                 mensajeAuditoria
         );
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("turno-update", responseDTO);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return responseDTO;
     }
 
     /**

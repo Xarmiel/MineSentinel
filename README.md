@@ -10,21 +10,22 @@ MineSentinel es una plataforma industrial backend y frontend construida con **Ja
 3. [Modelo de Datos y Entidades](#-modelo-de-datos-y-entidades)
 4. [Lógica de Negocio y Servicios](#-lógica-de-negocio-y-servicios)
 5. [Endpoints de la API REST](#-endpoints-de-la-api-rest)
-6. [Frontend e Integración en Tiempo Real](#-frontend-e-integración-en-tiempo-real)
+6. [Frontend, Streaming SSE y Reportes](#-frontend-streaming-sse-y-reportes)
 7. [Seguridad y Autenticación](#-seguridad-y-autenticación)
-8. [Suite de Pruebas Unitarias](#-suite-de-pruebas-unitarias)
-9. [Instalación, Configuración y Ejecución](#-instalación-configuración-y-ejecución)
+8. [Cliente Python de Integración (YOLOv8)](#-cliente-python-de-integración-yolov8)
+9. [Suite de Pruebas Unitarias](#-suite-de-pruebas-unitarias)
+10. [Instalación, Configuración y Ejecución](#-instalación-configuración-y-ejecución)
 
 ---
 
 ## 🏗️ Visión General y Arquitectura
 
-MineSentinel implementa una arquitectura en capas limpia y orientada al dominio industrial:
+MineSentinel implementa una arquitectura en capas orientada al dominio industrial de alta concurrencia y tolerancia a fallos:
 
 ```mermaid
 graph TD
-    YOLO[Cámaras / YOLOv8 + ByteTrack] -->|HTTP REST POST / JSON| REST[AforoRestController / CatalogoRestController]
-    WEB[Navegador Web / Dashboard] -->|HTTP GET/POST & Polling 3s| MVC[Controladores MVC / Thymeleaf]
+    YOLO[Cámaras / YOLOv8 + ByteTrack] -->|HTTP POST JSON & Snapshots| REST[Controladores REST]
+    WEB[Navegador Web / Dashboard] -->|Server-Sent Events SSE & GET/POST| MVC[Controladores MVC / Thymeleaf]
     
     REST --> SERV[Capa de Servicios]
     MVC --> SERV
@@ -34,6 +35,10 @@ graph TD
         SERV --> TurnoServ[EventoTurnoService]
         SERV --> SegServ[SeguridadInfraccionService]
         SERV --> AlertServ[AlertaService]
+        SERV --> SseServ[SseNotificationService]
+        SERV --> SnapServ[SnapshotStorageService]
+        SERV --> RepServ[ReporteExportService]
+        SERV --> NotifServ[NotificacionExternaService]
     end
     
     AforoServ --> REPO[Spring Data JPA Repositories]
@@ -48,6 +53,7 @@ graph TD
 - **Append-Only Event Ledger**: Los movimientos de personal (`MovimientoAforo`) no modifican contadores mutables en la base de datos; se registran como eventos inmutables en el ledger. El aforo actual se calcula dinámicamente mediante agregaciones SQL optimizadas (`COUNT` filtrado).
 - **Manejo de Solapamiento de Turnos**: Durante el cambio de guardia, múltiples turnos pueden estar en estado `ACTIVO` simultáneamente. La lógica de resolución asigna automáticamente las `ENTRADA` al turno entrante y las `SALIDA` al turno saliente.
 - **Filtrado Estricto de Aforo**: Se utiliza la propiedad `requiere_aforo` en `RolPersonal` para discriminar personal que impacta la capacidad física de la mina (operadores, técnicos) de visitantes o inspectores temporales.
+- **Streaming Instantáneo (SSE)**: Transmisión push en tiempo real (<50ms) hacia los tableros de control ante cualquier cruce o infracción detectada.
 
 ---
 
@@ -57,15 +63,19 @@ graph TD
 com.sentinelmine
 ├── SentinelMineApplication.java         # Clase principal / Entry point Spring Boot
 ├── config/
-│   └── SecurityConfig.java              # Configuración de BCrypt y seguridad HTTP
+│   ├── AuthInterceptor.java             # Interceptor de seguridad para rutas web
+│   ├── SecurityConfig.java              # Configuración de BCrypt y seguridad HTTP
+│   └── WebMvcConfig.java                # Registro de interceptores MVC
 ├── controller/
 │   ├── AforoRestController.java         # API REST para YOLOv8 y consumo SPA
 │   ├── AuthController.java              # Login y gestión de sesiones
 │   ├── CamaraController.java            # Visualización de cámaras y streams
 │   ├── CatalogoRestController.java      # Catálogos de EPP y anomalías
 │   ├── DashboardController.java         # Vista principal del Centro de Control
-│   ├── HistorialController.java         # Historial de eventos y auditoría
-│   └── PanelAdminController.java        # Administración de turnos y seguridad
+│   ├── HistorialController.java         # Historial de eventos y exportación CSV
+│   ├── PanelAdminController.java        # Administración de turnos y actas oficiales
+│   ├── SnapshotRestController.java      # Carga y servicio de evidencias fotográficas
+│   └── StreamRestController.java        # Streaming Server-Sent Events (SSE)
 ├── dto/
 │   ├── AforoDTO.java                    # DTO de aforo y balance
 │   ├── AlertaViewDTO.java               # DTO para renderizado de alertas
@@ -78,23 +88,7 @@ com.sentinelmine
 │       ├── AforoGlobalResponseDTO.java  # Respuesta agregada en tiempo real
 │       ├── CierreTurnoResponseDTO.java  # Resultado del cierre y auditoría
 │       └── ErrorResponseDTO.java        # Formato estándar de errores
-├── entity/
-│   ├── AnomaliaMovimiento.java          # Registro de anomalías de movimiento
-│   ├── CatalogoAnomalias.java           # Catálogo maestro de anomalías
-│   ├── CatalogoEPP.java                 # Catálogo maestro de tipos de EPP
-│   ├── CierreAuditoriaTurno.java        # Auditoría inmutable de cierre de turno
-│   ├── EventoTurno.java                 # Instancia operativa de turno ejecutado
-│   ├── FaltaEPP.java                    # Registro de faltas de EPP
-│   ├── MovimientoAforo.java             # Event Ledger de entradas/salidas
-│   ├── RolPersonal.java                 # Roles (Operador, Supervisor, etc.)
-│   ├── Turno.java                       # Plantilla de turno (Día, Noche, Mixto)
-│   ├── Usuario.java                     # Credenciales y roles de acceso
-│   └── enums/
-│       ├── EstadoAlerta.java            # PENDIENTE, REVISADA, DESCARTADA
-│       ├── EstadoTurno.java             # ACTIVO, CERRADO, CANCELADO
-│       └── TipoMovimiento.java          # ENTRADA, SALIDA
-├── exception/
-│   └── GlobalExceptionHandler.java      # Manejador global de excepciones REST
+├── entity/                              # Entidades JPA (Turno, MovimientoAforo, FaltaEPP, etc.)
 ├── repository/                          # Repositorios Spring Data JPA
 └── service/
     ├── AforoService.java                # Métodos de cálculo de aforo
@@ -103,8 +97,17 @@ com.sentinelmine
     ├── DatabaseInitializerService.java  # Carga de datos iniciales y seed
     ├── DeteccionEppService.java          # Lógica de detección de EPP
     ├── EventoTurnoService.java          # Apertura, cierre y auditoría de turnos
-    ├── MovimientoAforoService.java      # Ingesta en Event Ledger
-    └── SeguridadInfraccionService.java  # Ingesta de faltas EPP y anomalías
+    ├── MovimientoAforoService.java      # Ingesta en Event Ledger y emisión SSE
+    ├── NotificacionExternaService.java  # Despacho de alertas a supervisores
+    ├── ReporteExportService.java        # Exportación CSV y Actas Oficiales PDF/HTML
+    ├── SeguridadInfraccionService.java  # Ingesta de faltas EPP y anomalías
+    ├── SnapshotStorageService.java      # Almacenamiento local de fotos de evidencia
+    └── SseNotificationService.java      # Servidor push Server-Sent Events
+
+python_client/
+├── yolo_sentinel_client.py              # Script de inferencia y simulación continua
+├── requirements.txt                     # Dependencias Python (requests, opencv, ultralytics)
+└── README.md                            # Guía de ejecución del cliente Python
 ```
 
 ---
@@ -140,26 +143,22 @@ Registro inmutable generado al invocar el cierre de un `EventoTurno`:
 ## ⚙️ Lógica de Negocio y Servicios
 
 ### `EventoTurnoService`
-1. **`abrirTurno(Long turnoId, String usuario)`**:
-   - Utiliza nivel de aislamiento `@Transactional(isolation = Isolation.READ_COMMITTED)`.
-   - Permite abrir un nuevo turno aunque existan turnos previos en estado `ACTIVO`, facilitando el solapamiento durante el relevo de guardia.
-2. **`cerrarTurno(Long eventoId, String observaciones, String usuario)`**:
-   - Cierra atómicamente el turno especificado.
-   - Realiza el cálculo del balance de aforo contabilizando exclusivamente movimientos con `requiere_aforo = true`.
-   - Persiste la entidad `CierreAuditoriaTurno` y actualiza el estado a `CERRADO`.
-3. **`resolverEventoActivoParaMovimiento(TipoMovimiento tipo)`**:
-   - Si no hay solapamiento, devuelve el único turno activo.
-   - En solapamiento:
-     - `ENTRADA` $\rightarrow$ Asigna al turno más reciente (nuevo personal ingresando).
-     - `SALIDA` $\rightarrow$ Asigna al turno más antiguo (personal del turno saliente).
+1. **`abrirTurno(Long turnoId, LocalDateTime fechaInicio)`**:
+   - Nivel de aislamiento `@Transactional(isolation = Isolation.READ_COMMITTED)`.
+   - Permite solapamiento de turnos durante el cambio de guardia y emite evento SSE `turno-update`.
+2. **`cerrarTurno(Long eventoId)`**:
+   - Cierre atómico, conciliación estricta de aforo (`requiere_aforo = true`) y registro inmutable en `cierres_auditoria_turno`.
+3. **`resolverEventoActivoParaMovimiento(LocalDateTime fechaHora, TipoMovimiento tipo)`**:
+   - Asigna inteligentemente las entradas a la guardia entrante y las salidas a la saliente durante solapamientos.
 
-### `MovimientoAforoService`
-- Registra cada cruce con validación de existencia de turnos activos.
-- En caso de que el cliente YOLOv8 no envíe `evento_id`, invoca `resolverEventoActivoParaMovimiento` para imputar el evento correctamente.
+### `SseNotificationService`
+- Gestiona conexiones de streaming HTTP unidireccional y envía notificaciones instantáneas de eventos a todos los tableros web suscritos.
 
-### `SeguridadInfraccionService`
-- Ingesta infracciones (`FaltaEPP` y `AnomaliaMovimiento`).
-- Vincula automáticamente el evento al turno activo si no es provisto explícitamente en el payload.
+### `SnapshotStorageService`
+- Almacena evidencias visuales en el directorio de almacenamiento (`./uploads/snapshots/`) y las sirve de forma segura como recurso web.
+
+### `ReporteExportService`
+- Genera archivos CSV compatibles con Microsoft Excel y el Acta Oficial de Reconciliación de Guardia formateada para impresión o descarga PDF.
 
 ---
 
@@ -175,60 +174,59 @@ Registro inmutable generado al invocar el cierre de un `EventoTurno`:
 ### 2. Seguridad e Infracciones (YOLOv8)
 | Método | Ruta | Descripción | Payload / Parámetros |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/seguridad/faltas-epp` | Registra infracción de EPP | `{"tipoEppId": 1, "nivelConfianza": 0.94, "snapshotUrl": "/evidencias/epp_101.jpg"}` |
-| `POST` | `/api/v1/seguridad/anomalias` | Registra anomalía de movimiento | `{"tipoAnomaliaId": 2, "nivelConfianza": 0.88, "snapshotUrl": "/evidencias/anom_102.jpg"}` |
-| `GET` | `/api/v1/alertas/recientes` | Alertas recientes | Lista de incidentes pendientes y recientes |
+| `POST` | `/api/v1/seguridad/faltas-epp` | Registra infracción de EPP | `{"eppId": 1, "rolId": 1, "nivelConfianza": 0.94, "snapshotUrl": "..."}` |
+| `POST` | `/api/v1/seguridad/anomalias` | Registra anomalía de movimiento | `{"catalogoAnomaliaId": 2, "rolId": 1, "nivelConfianza": 0.88, "snapshotUrl": "..."}` |
+| `POST` | `/api/v1/evidencias/upload` | Sube fotografía de evidencia | Form Data: `file` (imagen multipart) |
+| `GET` | `/api/v1/evidencias/{filename}` | Descarga o visualiza evidencia | Devuelve stream de imagen (`image/jpeg`) |
 
-### 3. Gestión de Turnos y Auditoría
-| Método | Ruta | Descripción | Payload / Parámetros |
+### 3. Streaming en Tiempo Real (SSE)
+| Método | Ruta | Descripción | Tipo de Respuesta |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/turnos/abrir` | Inicia un nuevo turno | `?turnoId=1&usuario=admin` |
-| `POST` | `/api/v1/turnos/{eventoId}/cerrar` | Cierra y audita el turno | `?observaciones=Relevo+normal&usuario=admin` |
-| `GET` | `/api/v1/turnos/activos` | Lista turnos actualmente activos | Array de `EventoTurno` |
+| `GET` | `/api/v1/stream/eventos` | Suscripción a eventos en tiempo real | `text/event-stream` (`aforo-update`, `alerta-nueva`, `turno-update`) |
+
+### 4. Reportes y Auditoría
+| Método | Ruta | Descripción | Tipo de Respuesta |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/historial/exportar/csv` | Descarga de historial en CSV | Archivo descargable `.csv` |
+| `GET` | `/panel-admin/turnos/{id}/acta` | Visualización e impresión de Acta Oficial | HTML imprimible / Guardar PDF |
 
 ---
 
-## 🖥️ Frontend e Integración en Tiempo Real
+## 🖥️ Frontend, Streaming SSE y Reportes
 
-Las vistas Thymeleaf se encuentran en `src/main/resources/templates/`:
-- **`dashboard.html`**: Centro de mando con tarjetas de KPI (Aforo actual, personal en interior, balance de turno, cámaras activas) y tabla de alertas en vivo.
-- **`panel-admin.html`**: Gestión de turnos, apertura/cierre de guardia, historial de auditorías y configuración.
-- **`camara.html`**: Visualización de streams de video e inferencia en tiempo real.
-- **`historial.html`**: Consulta histórica de cruces de aforo y exportación de reportes.
-- **`login.html`**: Pantalla de autenticación corporativa.
-
-### Actualización Asíncrona (Background Polling)
-El frontend incluye scripts JavaScript que realizan consultas periódicas cada **3 segundos** a `/api/v1/aforo/tiempo-real` y `/api/v1/alertas/recientes`, actualizando el DOM dinámicamente sin necesidad de recargar la página.
+- **`dashboard.html`**: Tablero principal conectado a Server-Sent Events con soporte de refresco instantáneo y polling de respaldo cada 3s.
+- **`panel-admin.html`**: Panel de supervisión con botón de despacho de alertas a jefes de turno y enlace al Acta Oficial de Cierre.
+- **`camara.html`**: Monitor de cámara en boca-mina con detección de pose/rostro y panel de prueba de EPP.
+- **`historial.html`**: Tabla completa de eventos con botón de **Exportar Historial a CSV (Excel)**.
+- **`login.html`**: Acceso seguro corporativo con validación BCrypt y sesiones HTTP.
 
 ---
 
-## 🔒 Seguridad y Autenticación
+## 🐍 Cliente Python de Integración (YOLOv8)
 
-- **`SecurityConfig`**: Configuración de `BCryptPasswordEncoder` para el hash seguro de contraseñas.
-- **Control de Acceso**:
-  - `ADMIN`: Acceso total al panel administrativo, gestión de turnos y configuración.
-  - `SUPERVISOR`: Monitoreo de dashboard, cámaras y cierre de turnos.
-  - `OPERADOR`: Visualización de alertas y dashboard.
-- **Credenciales por Defecto**:
-  - Usuario: `admin`
-  - Contraseña: `sentinel123`
+Ubicado en el directorio `python_client/`:
+```bash
+cd python_client
+pip install -r requirements.txt
+
+# Ejecutar en modo simulación industrial continua:
+python yolo_sentinel_client.py --mode simulation --interval 3
+```
 
 ---
 
-## 🧪 Suite de Pruebas Unitarias
+## 🧪 Suite de Pruebas Unitarias (30 Tests)
 
 La suite de pruebas automatizadas está construida con **JUnit Jupiter 5** y **Mockito**:
 
-- **`AforoDTOTest`**: Valida constructores y cálculos derivados del balance de aforo.
-- **`EntityMappingTest`**: Verifica el mapeo JPA, relaciones de clave foránea y comportamiento de enumeraciones.
-- **`EventoTurnoServiceTest`**:
-  - Apertura de turnos con y sin solapamiento previo.
-  - Cierre y cálculo atómico de auditoría excluyendo `requiere_aforo = false`.
-  - Algoritmo de resolución de turnos durante solapamiento.
-  - Excepciones ante turnos inexistentes o ya cerrados.
-- **`MovimientoAforoServiceTest`**:
-  - Inserción en Event Ledger y resolución automática de turno activo.
-  - Validación de excepción cuando no existen turnos activos en operación.
+- **`AforoDTOTest`** (2 tests): Cálculos y balances de aforo.
+- **`EntityMappingTest`** (4 tests): Mapeo JPA, claves foráneas y enums.
+- **`EventoTurnoServiceTest`** (8 tests): Solapamiento, apertura, cierre atómico y balance de auditoría.
+- **`MovimientoAforoServiceTest`** (4 tests): Ingesta en Event Ledger y resolución de turno.
+- **`SeguridadInfraccionServiceTest`** (4 tests): Ingesta de faltas EPP, anomalías y transiciones de estado.
+- **`SnapshotStorageServiceTest`** (3 tests): Almacenamiento Multipart, Base64 y validaciones de archivo.
+- **`SseNotificationServiceTest`** (2 tests): Conexión de clientes SSE y emisión de eventos.
+- **`ReporteExportServiceTest`** (3 tests): Exportación CSV de alertas, movimientos y Acta Oficial.
 
 ### Ejecución de Pruebas:
 ```powershell
@@ -241,25 +239,18 @@ La suite de pruebas automatizadas está construida con **JUnit Jupiter 5** y **M
 
 ### 1. Prerrequisitos
 - **Java Development Kit (JDK)**: Versión 17 o superior (compatible con Java 21/26).
-- **Base de Datos**: PostgreSQL 14+ (o instancia remota en Supabase).
+- **Base de Datos**: PostgreSQL 14+ (o instancia en Supabase).
 
-### 2. Configuración (`application.properties`)
-Ubicación: `src/main/resources/application.properties`
-```properties
-spring.datasource.url=jdbc:postgresql://<HOST>:<PORT>/<DATABASE>
-spring.datasource.username=<USUARIO>
-spring.datasource.password=<PASSWORD>
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=false
+### 2. Ejecutar Pruebas y Compilar
+```powershell
+.\mvnw.cmd test
 ```
 
-### 3. Compilación y Ejecución
+### 3. Iniciar la Aplicación Spring Boot
 ```powershell
-# Compilar el proyecto y ejecutar los tests
-.\mvnw.cmd clean test
-
-# Iniciar la aplicación en modo desarrollo
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación estará disponible en `http://localhost:8080/login`.
+- **URL de Acceso**: `http://localhost:8080/login`
+- **Usuario**: `admin`
+- **Contraseña**: `sentinel123`

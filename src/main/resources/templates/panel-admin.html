@@ -54,6 +54,11 @@
             </div>
         </div>
     </section>
+    <div style="margin-top: 20px; text-align: right;">
+        <a th:href="@{/panel-admin/turnos/1/acta}" target="_blank" class="badge badge-success" style="padding: 10px 18px; text-decoration: none; font-size: 13px;">
+            📄 Ver Acta Oficial de Cierre / Auditoría (PDF)
+        </a>
+    </div>
 </main>
 <script>
     async function refrescarAdmin() {
@@ -81,6 +86,14 @@
             console.debug('Error en refresco asíncrono admin:', e);
         }
     }
+
+    if (!!window.EventSource) {
+        const source = new EventSource('/api/v1/stream/eventos');
+        source.addEventListener('aforo-update', () => refrescarAdmin());
+        source.addEventListener('alerta-nueva', () => refrescarAdmin());
+        source.addEventListener('alerta-actualizada', () => refrescarAdmin());
+    }
+
     setInterval(refrescarAdmin, 3000);
 </script>
 </body>
