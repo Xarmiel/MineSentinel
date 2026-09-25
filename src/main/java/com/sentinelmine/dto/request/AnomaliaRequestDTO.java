@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 public class AnomaliaRequestDTO {
 
-    @NotNull(message = "El eventoId es obligatorio")
+    // Opcional: Si es nulo, el backend asocia automáticamente el evento de turno activo
     private Long eventoId;
 
     private Long rolId;

@@ -25,28 +25,38 @@ public class SeguridadInfraccionService {
     private final CatalogoEPPRepository catalogoEPPRepository;
     private final CatalogoAnomaliasRepository catalogoAnomaliasRepository;
     private final RolPersonalRepository rolPersonalRepository;
+    private final EventoTurnoService eventoTurnoService;
 
     public SeguridadInfraccionService(FaltaEPPRepository faltaEPPRepository,
                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository,
                                      EventoTurnoRepository eventoTurnoRepository,
                                      CatalogoEPPRepository catalogoEPPRepository,
                                      CatalogoAnomaliasRepository catalogoAnomaliasRepository,
-                                     RolPersonalRepository rolPersonalRepository) {
+                                     RolPersonalRepository rolPersonalRepository,
+                                     EventoTurnoService eventoTurnoService) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.catalogoEPPRepository = catalogoEPPRepository;
         this.catalogoAnomaliasRepository = catalogoAnomaliasRepository;
         this.rolPersonalRepository = rolPersonalRepository;
+        this.eventoTurnoService = eventoTurnoService;
     }
 
     /**
-     * Registra una falta de EPP detectada en tiempo real.
+     * Registra una falta de EPP detectada en tiempo real por YOLOv8.
      */
     @Transactional
     public FaltaEPP registrarFaltaEPP(FaltaEPPRequestDTO dto) {
-        EventoTurno evento = eventoTurnoRepository.findById(dto.getEventoId())
-                .orElseThrow(() -> new IllegalArgumentException("No se encontró el evento de turno #" + dto.getEventoId()));
+        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
+
+        EventoTurno evento;
+        if (dto.getEventoId() != null) {
+            evento = eventoTurnoRepository.findById(dto.getEventoId())
+                    .orElseThrow(() -> new IllegalArgumentException("No se encontró el evento de turno #" + dto.getEventoId()));
+        } else {
+            evento = eventoTurnoService.resolverEventoActivoParaMovimiento(fechaHora, com.sentinelmine.entity.enums.TipoMovimiento.ENTRADA);
+        }
 
         CatalogoEPP epp = catalogoEPPRepository.findById(dto.getEppId())
                 .orElseThrow(() -> new IllegalArgumentException("No se encontró el elemento EPP con ID #" + dto.getEppId()));
@@ -55,8 +65,6 @@ public class SeguridadInfraccionService {
         if (dto.getRolId() != null) {
             rol = rolPersonalRepository.findById(dto.getRolId()).orElse(null);
         }
-
-        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
 
         FaltaEPP falta = new FaltaEPP(
                 evento,
@@ -76,8 +84,15 @@ public class SeguridadInfraccionService {
      */
     @Transactional
     public AnomaliaMovimiento registrarAnomalia(AnomaliaRequestDTO dto) {
-        EventoTurno evento = eventoTurnoRepository.findById(dto.getEventoId())
-                .orElseThrow(() -> new IllegalArgumentException("No se encontró el evento de turno #" + dto.getEventoId()));
+        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
+
+        EventoTurno evento;
+        if (dto.getEventoId() != null) {
+            evento = eventoTurnoRepository.findById(dto.getEventoId())
+                    .orElseThrow(() -> new IllegalArgumentException("No se encontró el evento de turno #" + dto.getEventoId()));
+        } else {
+            evento = eventoTurnoService.resolverEventoActivoParaMovimiento(fechaHora, com.sentinelmine.entity.enums.TipoMovimiento.ENTRADA);
+        }
 
         CatalogoAnomalias catalogo = catalogoAnomaliasRepository.findById(dto.getCatalogoAnomaliaId())
                 .orElseThrow(() -> new IllegalArgumentException("No se encontró la anomalía en catálogo #" + dto.getCatalogoAnomaliaId()));
@@ -86,8 +101,6 @@ public class SeguridadInfraccionService {
         if (dto.getRolId() != null) {
             rol = rolPersonalRepository.findById(dto.getRolId()).orElse(null);
         }
-
-        LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
 
         AnomaliaMovimiento anomalia = new AnomaliaMovimiento(
                 evento,

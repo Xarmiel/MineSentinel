@@ -14,43 +14,74 @@
     <section class="aforo-card">
         <div class="card-header">
             <h3>Control de Aforo</h3>
-            <span class="badge badge-success" th:text="${aforo.estado}">AFORO NORMAL</span>
+            <span id="badgeAforo" class="badge badge-success" th:text="${aforo.estado}">AFORO NORMAL</span>
         </div>
         <div class="aforo-numbers">
-            <div><span class="num num-green" th:text="${aforo.actual}">42</span><small>AFORO ACTUAL</small></div>
-            <div><span class="num" th:text="${aforo.maximo}">50</span><small>MÁX. PERMITIDO</small></div>
-            <div><span class="num" th:text="${aforo.minimo}">10</span><small>MÍNIMO</small></div>
+            <div><span id="aforoActual" class="num num-green" th:text="${aforo.actual}">42</span><small>AFORO ACTUAL</small></div>
+            <div><span id="aforoMaximo" class="num" th:text="${aforo.maximo}">50</span><small>MÁX. PERMITIDO</small></div>
+            <div><span id="aforoMinimo" class="num" th:text="${aforo.minimo}">10</span><small>MÍNIMO</small></div>
         </div>
         <div class="progress-bar">
-            <div class="progress-fill" th:style="'width:' + ${aforo.porcentaje} + '%'"></div>
+            <div id="progressFill" class="progress-fill" th:style="'width:' + ${aforo.porcentaje} + '%'"></div>
         </div>
-        <p class="ultimo-evento">Último cruce de línea virtual<br><span th:text="${aforo.ultimoEvento}"></span></p>
+        <p class="ultimo-evento">Último cruce de línea virtual<br><span id="ultimoEvento" th:text="${aforo.ultimoEvento}"></span></p>
     </section>
 
     <section class="alertas-card">
         <div class="card-header">
             <h3>Alertas Recientes</h3>
-            <span class="badge" th:text="${#lists.size(alertas)} + ' eventos'"></span>
+            <span id="badgeAlertasConteo" class="badge" th:text="${#lists.size(alertas)} + ' eventos'"></span>
         </div>
-        <div class="alerta" th:each="a : ${alertas}" th:classappend="${a.prioridadAlta} ? 'alerta-alta' : ''">
-            <div class="alerta-header">
-                <strong th:text="${a.tituloVisual}"></strong>
-                <span class="hora" th:text="${a.horaFormateada}"></span>
+        <div id="contenedorAlertas">
+            <div class="alerta" th:each="a : ${alertas}" th:classappend="${a.prioridadAlta} ? 'alerta-alta' : ''">
+                <div class="alerta-header">
+                    <strong th:text="${a.tituloVisual}"></strong>
+                    <span class="hora" th:text="${a.horaFormateada}"></span>
+                </div>
+                <p th:text="${a.descripcion}"></p>
+                <div class="alerta-footer">
+                    <span class="tag" th:text="'TRABAJADOR #' + ${a.trabajadorCodigo}"></span>
+                    <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : 'tag-media'"
+                          th:text="'Prioridad ' + ${a.prioridadTexto}"></span>
+                </div>
+                <form method="post" th:action="@{/panel-admin/notificar}">
+                    <input type="hidden" name="idAlerta" th:value="${a.id}">
+                    <input type="hidden" name="tipoAlerta" th:value="${a.tipo}">
+                    <button type="submit" th:disabled="${a.notificadoJefeTurno}"
+                            th:text="${a.notificadoJefeTurno} ? '✔ Jefe de turno notificado' : '📨 Notificar al Jefe de Turno'">
+                    </button>
+                </form>
             </div>
-            <p th:text="${a.descripcion}"></p>
-            <div class="alerta-footer">
-                <span class="tag" th:text="'TRABAJADOR #' + ${a.trabajadorCodigo}"></span>
-                <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : 'tag-media'"
-                      th:text="'Prioridad ' + ${a.prioridadTexto}"></span>
-            </div>
-            <form method="post" th:action="@{/panel-admin/notificar}">
-                <input type="hidden" name="idAlerta" th:value="${a.id}">
-                <button type="submit" th:disabled="${a.notificadoJefeTurno}"
-                        th:text="${a.notificadoJefeTurno} ? '✔ Jefe de turno notificado' : '📨 Notificar al Jefe de Turno'">
-                </button>
-            </form>
         </div>
     </section>
 </main>
+<script>
+    async function refrescarAdmin() {
+        try {
+            const resAforo = await fetch('/api/v1/aforo/dashboard');
+            if (resAforo.ok) {
+                const data = await resAforo.json();
+                const badge = document.getElementById('badgeAforo');
+                if (badge) {
+                    badge.textContent = data.estado || 'AFORO NORMAL';
+                    badge.className = 'badge ' + (data.porcentaje >= 100 ? 'badge-alta' : (data.porcentaje >= 90 ? 'badge-media' : 'badge-success'));
+                }
+                const elActual = document.getElementById('aforoActual');
+                if (elActual) elActual.textContent = data.actual;
+                const elMax = document.getElementById('aforoMaximo');
+                if (elMax) elMax.textContent = data.maximo;
+                const elMin = document.getElementById('aforoMinimo');
+                if (elMin) elMin.textContent = data.minimo;
+                const elFill = document.getElementById('progressFill');
+                if (elFill) elFill.style.width = data.porcentaje + '%';
+                const elUltimo = document.getElementById('ultimoEvento');
+                if (elUltimo && data.ultimoEvento) elUltimo.textContent = data.ultimoEvento;
+            }
+        } catch (e) {
+            console.debug('Error en refresco asíncrono admin:', e);
+        }
+    }
+    setInterval(refrescarAdmin, 3000);
+</script>
 </body>
 </html>

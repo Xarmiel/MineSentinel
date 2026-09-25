@@ -1,5 +1,7 @@
 package com.sentinelmine.controller;
 
+import com.sentinelmine.dto.AforoDTO;
+import com.sentinelmine.dto.AlertaViewDTO;
 import com.sentinelmine.dto.request.AnomaliaRequestDTO;
 import com.sentinelmine.dto.request.FaltaEPPRequestDTO;
 import com.sentinelmine.dto.request.MovimientoRequestDTO;
@@ -9,6 +11,8 @@ import com.sentinelmine.entity.AnomaliaMovimiento;
 import com.sentinelmine.entity.EventoTurno;
 import com.sentinelmine.entity.FaltaEPP;
 import com.sentinelmine.entity.MovimientoAforo;
+import com.sentinelmine.service.AforoService;
+import com.sentinelmine.service.AlertaService;
 import com.sentinelmine.service.EventoTurnoService;
 import com.sentinelmine.service.MovimientoAforoService;
 import com.sentinelmine.service.SeguridadInfraccionService;
@@ -32,13 +36,19 @@ public class AforoRestController {
     private final MovimientoAforoService movimientoAforoService;
     private final EventoTurnoService eventoTurnoService;
     private final SeguridadInfraccionService seguridadInfraccionService;
+    private final AforoService aforoService;
+    private final AlertaService alertaService;
 
     public AforoRestController(MovimientoAforoService movimientoAforoService,
                                EventoTurnoService eventoTurnoService,
-                               SeguridadInfraccionService seguridadInfraccionService) {
+                               SeguridadInfraccionService seguridadInfraccionService,
+                               AforoService aforoService,
+                               AlertaService alertaService) {
         this.movimientoAforoService = movimientoAforoService;
         this.eventoTurnoService = eventoTurnoService;
         this.seguridadInfraccionService = seguridadInfraccionService;
+        this.aforoService = aforoService;
+        this.alertaService = alertaService;
     }
 
     // =========================================================================
@@ -112,5 +122,16 @@ public class AforoRestController {
     public ResponseEntity<List<AnomaliaMovimiento>> obtenerAnomaliasRecientes(
             @RequestParam(defaultValue = "10") int limit) {
         return ResponseEntity.ok(seguridadInfraccionService.obtenerUltimasAnomalias(limit));
+    }
+
+    @GetMapping("/aforo/dashboard")
+    public ResponseEntity<AforoDTO> obtenerResumenDashboard() {
+        return ResponseEntity.ok(aforoService.toDTO());
+    }
+
+    @GetMapping("/alertas/recientes")
+    public ResponseEntity<List<AlertaViewDTO>> obtenerAlertasRecientes(
+            @RequestParam(defaultValue = "5") int limit) {
+        return ResponseEntity.ok(alertaService.getAlertasRecientes(limit));
     }
 }
