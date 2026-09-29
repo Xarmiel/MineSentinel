@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>SentinelMine · Vista de Cámara</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: nav(${turno})}"></div>
+
+<main class="content-single">
+    <h2 class="section-title">Vista de Cámara</h2>
+
+    <div class="camera-card">
+        <img id="marcoMotor" class="camera-feed" alt="Video con deteccion de EPP del motor de vision">
+        <canvas id="overlayCamara" class="camera-overlay"></canvas>
+        <div class="camera-placeholder" id="placeholderCamara">
+            <span class="camera-icon">📷</span>
+            <p id="textoCamara">Esperando frames del motor de visión</p>
+        </div>
+    </div>
+    <p id="estadoDeteccion" class="small">Estado: sin señal del motor</p>
+
+    <div class="deteccion-panel">
+        <h3>Cuadro de cumplimiento de EPP (YOLOv8 en vivo)</h3>
+        <p class="small">Estado actual de cada trabajador rastreado. El color sale de la gravedad
+            del EPP que falta: <strong style="color:#dc2626">rojo = grave</strong>,
+            <strong style="color:#ea580c">naranja = intermedio</strong>,
+            <strong style="color:#16a34a">verde = cumple la norma</strong>. Cualquier objeto
+            no homologado (gorra, gafas de sol) siempre es rojo.</p>
+
+        <div class="cuadro-leyenda">
+            <span class="leyenda-item"><i class="leyenda-dot critico"></i> CRÍTICO — falta EPP grave o porta impostor</span>
+            <span class="leyenda-item"><i class="leyenda-dot intermedio"></i> INTERMEDIO — falta EPP de riesgo medio</span>
+            <span class="leyenda-item"><i class="leyenda-dot conforme"></i> CONFORME — EPP completo</span>
+            <span class="cuadro-estado" id="cuadroEstado">Sin señal del motor de visión</span>
+        </div>
+
+        <table class="cuadro-tabla" id="cuadroTabla">
+            <thead>
+            <tr>
+                <th>Track</th>
+                <th>Estado</th>
+                <th>EPP conforme</th>
+                <th>Elementos no detectados / no aptos</th>
+                <th>Confianza</th>
+            </tr>
+            </thead>
+            <tbody id="cuadroCuerpo">
+            <tr class="cuadro-vacio">
+                <td colspan="5">Esperando detections del motor YOLOv8…</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="deteccion-panel">
+        <h3>Identificación de EPP mediante YOLOv8</h3>
+        <p class="small">Este formulario simula el resultado de la inferencia del modelo sobre un frame capturado
+            (en producción, el modelo corre sobre el stream de video real).</p>
+        <form method="post" th:action="@{/camara/simular}">
+            <label>Código de trabajador</label>
+            <input type="text" name="codigoTrabajador" placeholder="16" required>
+            <button type="submit">Simular detección</button>
+        </form>
+
+        <div class="resultado" th:if="${resultado != null}">
+            <p th:if="${resultado.eppCompleto}" class="resultado-ok">
+                ✅ Trabajador #<span th:text="${resultado.trabajadorCodigo}"></span>: EPP completo. Ingreso autorizado.
+            </p>
+            <p th:unless="${resultado.eppCompleto}" class="resultado-fail">
+                ⚠️ Trabajador #<span th:text="${resultado.trabajadorCodigo}"></span>: falta
+                <span th:text="${resultado.elementoFaltante}"></span>. Ingreso bloqueado y alerta registrada.
+            </p>
+        </div>
+    </div>
+</main>
+</body>
+<script type="module">
+    // =====================================================================
+    // 1. CUADRO DE CUMPLIMIENTO (SSE) - datos del motor YOLOv8 real
+    // =====================================================================
+    const ETIQUETA = {
+        CONFORME: 'CONFORME',
+        INTERMEDIO: 'INTERMEDIO',
+        CRITICO: 'CRÍTICO'
+    };
+
+    const cuerpoCuadro = document.getElementById('cuadroCuerpo');
+    const estadoCuadro = document.getElementById('cuadroEstado');
+
+    function escapar(texto) {
+        const d = document.createElement('div');
+        d.textContent = texto == null ? '' : String(texto);
+        return d.innerHTML;
+    }
+
+    function pintarCuadro(cuadro) {
+        const personas = (cuadro && cuadro.personas) || [];
+
+        if (!personas.length) {
+            cuerpoCuadro.innerHTML =
+                '<tr class="cuadro-vacio"><td colspan="5">Sin trabajadores en cámara</td></tr>';
+            estadoCuadro.textContent = 'Motor conectado · 0 personas';
+            estadoCuadro.className = 'cuadro-estado';
+            return;
+        }
+
+        const conteo = { CONFORME: 0, INTERMEDIO: 0, CRITICO: 0 };
+        personas.forEach(p => {
+            const clave = (p.estado || 'CONFORME').toUpperCase();
+            conteo[clave] = (conteo[clave] || 0) + 1;
+        });
+
+        cuerpoCuadro.innerHTML = personas.map(p => {
+            const clave = (p.estado || 'CONFORME').toUpperCase();
+            const conformes = (p.conformes || []).join(', ') || '—';
+
+            const faltantes = (p.faltantes || []).map(f => {
+                const g = (f.gravedad || 'INTERMEDIO').toUpperCase();
+                const clase = g === 'GRAVE' ? 'chip critico' : 'chip intermedio';
+                const icono = (f.tipo || '').toUpperCase() === 'IMPOSTOR' ? ' ⛔' : '';
+                return '<span class="' + clase + '">' + escapar(f.nombre) + icono + '</span>';
+            }).join(' ') || '<span class="chip ok">sin faltantes</span>';
+
+            const conf = p.confianza != null ? (p.confianza * 100).toFixed(0) + '%' : '—';
+
+            return '<tr>' +
+                '<td><strong>#' + escapar(p.trackId) + '</strong></td>' +
+                '<td><span class="chip ' + clave.toLowerCase() + '">' + escapar(ETIQUETA[clave] || clave) + '</span></td>' +
+                '<td class="cuadro-conformes">' + escapar(conformes) + '</td>' +
+                '<td>' + faltantes + '</td>' +
+                '<td>' + conf + '</td>' +
+                '</tr>';
+        }).join('');
+
+        estadoCuadro.textContent = 'Rol: ' + (cuadro.nombreRol || '—') + ' · ' +
+            conteo.CRITICO + ' críticos / ' +
+            conteo.INTERMEDIO + ' intermedios / ' +
+            conteo.CONFORME + ' conformes';
+        estadoCuadro.className = 'cuadro-estado en-linea';
+    }
+
+    function conectarCuadro() {
+        // Estado inicial: si el motor ya publicó algo, se muestra de inmediato
+        // en lugar de esperar al primer evento SSE.
+        fetch('/api/v1/vision/cuadro')
+            .then(r => r.ok ? r.json() : null)
+            .then(c => { if (c) pintarCuadro(c); })
+            .catch(() => { });
+
+        const fuente = new EventSource('/api/v1/stream/eventos');
+
+        fuente.addEventListener('cuadro-epp', ev => {
+            try {
+                pintarCuadro(JSON.parse(ev.data));
+            } catch (e) {
+                console.warn('[cuadro] payload inválido', e);
+            }
+        });
+
+        fuente.onerror = () => {
+            estadoCuadro.textContent = 'Reconectando con el motor de visión…';
+            estadoCuadro.className = 'cuadro-estado sin-senal';
+        };
+    }
+
+    conectarCuadro();
+
+    // =====================================================================
+    // 2. FRAME DEL MOTOR DE VISION
+    // -----------------------------------------------------------------
+    // Esta vista NO abre la webcam. La consume el motor de YOLOv8, que es su
+    // unico propietario: una webcam solo admite un proceso a la vez, y cuando
+    // el motor la tiene el navegador recibe "Could not start video source".
+    // Por eso el motor publica el frame ya anotado y aqui solo se pinta.
+    // =====================================================================
+    const estadoDeteccion = document.getElementById('estadoDeteccion');
+    function setEstado(texto) {
+        estadoDeteccion.textContent = texto;
+    }
+
+    const marcoMotor = document.getElementById('marcoMotor');
+    const textoCamara = document.getElementById('textoCamara');
+    const placeholderCamara = document.getElementById('placeholderCamara');
+    const overlay = document.getElementById('overlayCamara');
+    let hayFrame = false;
+
+    function mostrarPlaceholder(mensaje) {
+        hayFrame = false;
+        marcoMotor.removeAttribute('src');
+        marcoMotor.style.display = 'none';
+        overlay.width = 0;
+        overlay.height = 0;
+        placeholderCamara.style.display = 'flex';
+        textoCamara.textContent = mensaje;
+        setEstado('Estado: sin senal del motor');
+    }
+
+    function ocultarPlaceholder() {
+        hayFrame = true;
+        marcoMotor.style.display = 'block';
+        placeholderCamara.style.display = 'none';
+    }
+
+    // El backend responde 204 mientras el motor no publique, en vez de repetir
+    // el ultimo frame. Asi "sin senal" y "video congelado" quedan distinguibles,
+    // que es justo lo que hace dudoso a un supervisor.
+    async function pedirFrame() {
+        try {
+            const res = await fetch('/api/v1/vision/frame', { cache: 'no-store' });
+            if (res.status === 204 || !res.ok) {
+                mostrarPlaceholder('Motor de vision sin senal');
+                return;
+            }
+
+            const blob = await res.blob();
+            const contentType = (res.headers.get('content-type') || blob.type || '').toLowerCase();
+            const esImagen = contentType.startsWith('image/') || blob.size > 0;
+            if (!esImagen || blob.size < 100) {
+                mostrarPlaceholder('Motor de vision sin senal');
+                return;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const anterior = marcoMotor.getAttribute('src');
+            marcoMotor.src = url;
+            if (anterior) URL.revokeObjectURL(anterior);
+            ocultarPlaceholder();
+        } catch (err) {
+            console.warn('No se pudo obtener el frame:', err);
+            mostrarPlaceholder('Motor de vision sin senal');
+        }
+    }
+
+    // El motor publica cada 2 fotogramas a ~3 fps, o sea una imagen nueva cada
+    // ~650 ms. Sondear mas rapido que eso solo gasta peticiones, y mas lento
+    // hace que el video parezca congelado aunque el motor este trabajando.
+    const cadenciaFrame = 700;
+    pedirFrame();
+    setInterval(pedirFrame, cadenciaFrame);
+</script>
+</html>

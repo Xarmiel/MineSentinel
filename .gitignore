@@ -1,0 +1,6 @@
+python_client/.venv/
+__pycache__/
+*.pyc
+**/.venv/
+**/__pycache__/
+*.py[cod]
