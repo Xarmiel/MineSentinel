@@ -1,6 +1,6 @@
 # 🛡️ MineSentinel — Sistema Integral de Seguridad y Control de Aforo Minero
 
-MineSentinel es una plataforma industrial backend y frontend construida con **Java 25 LTS**, **Spring Boot 3.3.4**, **Spring Data JPA**, **PostgreSQL** y **Thymeleaf**, diseñada para la supervisión y control de aforo, gestión de turnos concurrentes e ingesta en tiempo real de eventos de visión artificial (**YOLOv8 + ByteTrack**).
+MineSentinel es una plataforma industrial backend y frontend construida con **Java 17**, **Spring Boot 3.3.4**, **Spring Data JPA**, **PostgreSQL** y **Thymeleaf**, diseñada para la supervisión y control de aforo, gestión de turnos concurrentes e ingesta en tiempo real de eventos de visión artificial (**YOLOv8 + ByteTrack**).
 
 ---
 
@@ -238,7 +238,7 @@ La suite de pruebas automatizadas está construida con **JUnit Jupiter 5** y **M
 ## 🚀 Instalación, Configuración y Ejecución
 
 ### 1. Prerrequisitos
-- **Java Development Kit (JDK)**: Versión 25 (LTS).
+- **Java Development Kit (JDK)**: Versión 17 o superior.
 - **Base de Datos**: PostgreSQL 14+ (o instancia en Supabase).
 
 ### 2. Ejecutar Pruebas y Compilar

@@ -25,7 +25,25 @@ public class CuadroEPPRequestDTO {
     private List<Integer> dimensiones;
     private List<Persona> personas = new ArrayList<>();
 
+    /**
+     * El motor no está ejecutando YOLOv8: publica datos fabricados.
+     *
+     * Existe para que /camara pueda advertirlo en pantalla. En modo simulación
+     * el motor no detecta nada y nunca publica un frame, así que sin esta marca
+     * la vista queda indistinguible de "el detector funciona pero la cámara no
+     * ve a nadie", que es el diagnóstico que más tiempo cuesta en el campo.
+     */
+    private Boolean simulacion = Boolean.FALSE;
+
     public CuadroEPPRequestDTO() {
+    }
+
+    public Boolean getSimulacion() {
+        return simulacion;
+    }
+
+    public void setSimulacion(Boolean simulacion) {
+        this.simulacion = simulacion != null && simulacion;
     }
 
     public Integer getRolId() {

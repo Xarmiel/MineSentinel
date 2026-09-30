@@ -89,6 +89,11 @@ body { background: #f5f4f0; color: #1c1c1c; }
 .cuadro-estado { margin-left: auto; font-size: .72rem; padding: .2rem .55rem; border-radius: 999px; background: #2b303b; color: #9aa0ab; }
 .cuadro-estado.en-linea { background: #1d3a24; color: #6ee7a0; }
 .cuadro-estado.sin-senal { background: #3a1d1d; color: #fca5a5; }
+.cuadro-estado.simulacion { background: #3d3410; color: #fde047; }
+.aviso-motor { display: none; margin: 0 0 .7rem; padding: .6rem .75rem; border-radius: .5rem;
+    border: 1px solid #713f12; background: #422006; color: #fde68a; font-size: .76rem; line-height: 1.45; }
+.aviso-motor.visible { display: block; }
+.aviso-motor code { background: #1c1408; padding: .05rem .3rem; border-radius: .2rem; color: #fcd34d; }
 
 .cuadro-tabla { width: 100%; border-collapse: collapse; margin-top: .4rem; font-size: .76rem; }
 .cuadro-tabla th { text-align: left; padding: .45rem .5rem; color: #7d8390; font-weight: 600; text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; border-bottom: 1px solid #2b303b; }

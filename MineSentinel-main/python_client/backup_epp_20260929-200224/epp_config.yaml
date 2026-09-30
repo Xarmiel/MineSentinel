@@ -1,0 +1,252 @@
+# =============================================================================
+# MINE SENTINEL — CONFIGURACIÓN DEL DETECTOR DE EPP (YOLOv8)
+# =============================================================================
+# Este archivo es la única fuente de verdad del pipeline de visión:
+#   - qué pesos se cargan y cómo se fusionan,
+#   - a qué clase canónica de EPP corresponde cada clase del modelo,
+#   - qué EPP es obligatorio para cada rol de la mina,
+#   - qué se considera un "instrumento no apto" (impostor de EPP).
+#
+# Los identificadores (epp_id / catalogo_anomalia_id) NO se escriben aquí:
+# el cliente los resuelve al arrancar contra GET /api/v1/catalogos/epp.
+# =============================================================================
+
+modelo:
+  # Detector de personas dedicado: aporta las cajas con track_id que anclan el EPP.
+  # Los modelos de EPP se entrenan sobre recortes cerrados de torso/cabeza, por lo que
+  # su clase "person" es poco fiable para aforo; un detector COCO es preciso y muy rápido.
+  # `pesos: "yolov8n.pt"` se descarga automáticamente de los releases de Ultralytics.
+  # Usa "yolov8s.pt" si tienes GPU y quieres más precisión.
+  personas:
+    nombre: "coco-personas"
+    pesos: "yolov8n.pt"
+    clases: ["person"]
+
+  # Modelo principal de EPP. Solo aporta elementos (casco, chaleco, gafas...).
+  principal:
+    nombre: "vyra-ppe"
+    repo_hf: "Hexmon/vyra-yolo-ppe-detection"
+    archivo: "best.pt"
+    # Clases que este modelo considera "persona". Sólo se usan si el bloque
+    # `personas:` de arriba está ausente.
+    clases_persona: ["person"]
+
+  # Modelos que se ejecutan además del principal y cuyas detecciones se fusionan.
+  # Se usan para cubrir elementos que el modelo principal no distingue
+  # (aquí, el calzado de seguridad: "shoes" / "no_shoes").
+  adicionales:
+    - nombre: "keremberke-ppe"
+      repo_hf: "keremberke/yolov8s-protective-equipment-detection"
+      archivo: "best.pt"
+    # Para usar pesos propios, comenta el bloque anterior y usa rutas locales:
+    # - nombre: "epp-mina"
+    #   ruta: "C:/modelos/best.pt"
+
+  imgsz: 640
+  confianza: 0.35          # umbral de confianza por detección
+  iou: 0.45                # umbral de IoU para el NMS interno de cada modelo
+  device: "cpu"            # "cuda:0" si hay GPU NVIDIA disponible
+
+asignacion:
+  # Margen (fracción del ancho de la persona) para asignar un EPP que cae
+  # justo fuera de la caja de la persona, p.ej. un casco en la parte alta.
+  margen_x: 0.15
+  # Margen vertical (fracción de la altura) para capturar EPP de cabeza
+  # (gorra,absence de casco) cuyo centro cae por encima del recuadro.
+  margen_y: 0.10
+  # Si un EPP queda sin persona asignada, se reporta como hallazgo suelto
+  # sólo cuando supera esta confianza (evita ruido con detecciones lejanas).
+  confianza_suelto: 0.60
+
+# =============================================================================
+# CATÁLOGO CANÓNICO DE EPP
+# =============================================================================
+# "verificable: false" = ningún modelo cargado sabe detectarlo, por lo que el
+# motor de reglas lo registra pero NUNCA genera una alerta por ausencia
+# (evitan falsos positivos de "falta de lámpara" que la cámara no puede ver).
+# =============================================================================
+# =============================================================================
+# CATÁLOGO DE EPP MONITOREADO
+# =============================================================================
+# gravedad = nivel de peligrosidad si el elemento NO se está usando.
+#   GRAVE      -> la ausencia puede causar lesión grave o muerte (rojo)
+#   INTERMEDIO -> aumenta el riesgo pero no es mortal por sí solo (naranja)
+# Todo elemento con tipo: IMPOSTOR es GRAVE por definición (está en
+# `impostores:` y así se fuerza en el motor), porque no sólo falta el EPP
+# homologado: hay algo actively que lo suplanta.
+# =============================================================================
+catalogo_epp:
+  CASCO:
+    nombre: "Casco de Seguridad con Barbiquejo"
+    tipo: "CONFORME"
+    gravedad: "GRAVE"
+    verificable: true
+  CHALECO:
+    nombre: "Chaleco Reflectivo de Alta Visibilidad"
+    tipo: "CONFORME"
+    gravedad: "INTERMEDIO"
+    verificable: true
+  GAFAS:
+    nombre: "Gafas de Seguridad / Protectoras"
+    tipo: "CONFORME"
+    gravedad: "GRAVE"
+    verificable: true
+  GUANTES:
+    nombre: "Guantes de Seguridad"
+    tipo: "CONFORME"
+    gravedad: "INTERMEDIO"
+    verificable: true
+  MASCARA:
+    nombre: "Mascarilla / Respirador contra Polvo"
+    tipo: "CONFORME"
+    gravedad: "INTERMEDIO"
+    verificable: true
+  BOTAS:
+    nombre: "Botas de Seguridad con Puntera de Acero"
+    tipo: "CONFORME"
+    gravedad: "GRAVE"
+    verificable: true
+  LAMPARA:
+    nombre: "Lámpara Minera Frontal"
+    tipo: "CONFORME"
+    gravedad: "GRAVE"
+    verificable: false
+  RESPIRADOR:
+    nombre: "Respirador contra Polvo / Vapores"
+    tipo: "CONFORME"
+    gravedad: "INTERMEDIO"
+    verificable: false
+
+# =============================================================================
+# MAPEO DE CLASES DEL MODELO → CLASES CANÓNICAS
+# =============================================================================
+# Se comparan en minúsculas y con guiones convertidos a "_".
+#   conforme: el elemento se está usando correctamente (no genera alerta)
+#   ausencia:  el modelo detecta explícitamente que NO se usa (alerta FALTANTE
+#              con evidencia directa)
+mapeo_clases:
+  CASCO:
+    conforme: ["hardhat", "helmet", "helmet_on", "safety_helmet", "casco"]
+    ausencia: ["no_hardhat", "no_helmet", "helmet_off", "no_safety_helmet", "sin_casco"]
+  CHALECO:
+    conforme: ["safety_vest", "vest", "hi_vis_vest", "reflective_vest", "jacket_on", "chaleco"]
+    ausencia: ["no_safety_vest", "no_vest", "jacket_off", "sin_chaleco"]
+  GAFAS:
+    conforme: ["goggles", "safety_goggles", "protective_glasses", "gafas"]
+    ausencia: ["no_goggles", "goggles_off", "sin_gafas"]
+  GUANTES:
+    conforme: ["gloves", "glove", "safety_gloves", "guantes"]
+    ausencia: ["no_gloves", "no_glove", "gloves_off", "sin_guantes"]
+  MASCARA:
+    conforme: ["mask", "respirator", "face_mask", "mascara"]
+    ausencia: ["no_mask", "mask_off", "sin_mascara"]
+  BOTAS:
+    conforme: ["shoes", "boots", "safety_shoes", "safety_boots", "botas"]
+    ausencia: ["no_shoes", "no_boots", "shoes_off", "sin_botas"]
+
+# =============================================================================
+# INSTRUMENTOS NO APTOS (IMPOSTORES DE EPP)
+# =============================================================================
+# Objetos que el modelo puede identificar y que se hacen pasar por EPP
+# homologado. La alerta se emite con tipo "IMPOSTOR" (más grave que "FALTANTE")
+# porque además del riesgo técnico hay un intento de encubrimiento.
+#
+# Ninguno de los modelos públicos de EPP trae estas clases: si entrenas tu
+# propio modelo con "gorra", "gafas de sol" y "zapatillas", basta con añadirlas
+# aquí y el motor las tratará automáticamente como no aptas.
+# =============================================================================
+impostores:
+  GORRA:
+    sustituye: "CASCO"
+    clases: ["cap", "baseball_cap", "gorra", "hat", "beanie", "cowboy_hat", "sombrilla"]
+    nombre: "Gorra / Sombrero No Apto como Casco"
+    descripcion: "Se porta un tocado no certificado en lugar del casco de seguridad con barbiquejo"
+  GAFAS_SOL:
+    sustituye: "GAFAS"
+    clases: ["sunglasses", "gafas_de_sol", "shades", "sun_glasses"]
+    nombre: "Gafas de Sol No Aptas como Gafas de Seguridad"
+    descripcion: "Se emplean gafas de sol sin homologación ni protección lateral frente a proyecciones"
+  CALZADO_NORMAL:
+    sustituye: "BOTAS"
+    clases: ["sneakers", "zapatillas", "trainers", "sport_shoes", "zapatos"]
+    nombre: "Calzado Normal / Zapatillas Deportivas"
+    descripcion: "Se utiliza calzado civil sin puntera de acero ni suela anticorte"
+
+# =============================================================================
+# EPP OBLIGATORIO POR ROL
+# =============================================================================
+# La clave es el rol_id de la tabla roles_personal.
+# La clave "*" aplica a cualquier rol_id no listado.
+# =============================================================================
+roles:
+  1:
+    nombre: "Operador de Maquinaria / Perforista"
+    obligatorio: ["CASCO", "CHALECO", "BOTAS", "GAFAS", "GUANTES"]
+  2:
+    nombre: "Supervisor de Seguridad / Ingeniero de Minas"
+    obligatorio: ["CASCO", "CHALECO", "BOTAS", "GAFAS"]
+  3:
+    nombre: "Técnico Electricista / Mantenimiento"
+    obligatorio: ["CASCO", "CHALECO", "GAFAS", "GUANTES", "BOTAS"]
+  4:
+    nombre: "Geólogo / Topógrafo"
+    obligatorio: ["CASCO", "CHALECO", "BOTAS"]
+  5:
+    nombre: "Visitante Técnico / Auditor"
+    obligatorio: ["CASCO", "CHALECO", "BOTAS"]
+  "*":
+    nombre: "Personal sin rol asignado"
+    obligatorio: ["CASCO", "CHALECO", "BOTAS"]
+
+# =============================================================================
+# ANOMALÍAS DE COMPORTAMIENTO DETECTABLES POR VISIÓN
+# =============================================================================
+anomalias:
+  CAIDA:
+    clases: ["fall_detected", "fall", "person_fall"]
+    nombre: "Detección de Caída o Postura Anómala"
+    descripcion: "El modelo detecta una posible caída en el área monitoreada"
+
+# =============================================================================
+# CONTROL DE EMISIÓN (ANTI-SATURACIÓN DE ALERTAS)
+# =============================================================================
+emision:
+  # Segundos que un track_id debe permanecer sin infracciones antes de que
+  # se vuelva a reportar la misma combinación (elemento + tipo).
+  enfriamiento_segundos: 90.0
+  # Cuántos frames se exige que un track lleve continual sin infracciones antes
+  # de permitir un nuevo reporte. Filtra falsos positivos de un solo frame.
+  frames_estables: 5
+  # Confianza mínima para que una ausencia sin evidencia directa genere alerta.
+  confianza_minima_alerta: 0.45
+
+# =============================================================================
+# CUADRO DE CUMPLIMIENTO (vista en vivo por persona)
+# =============================================================================
+# Es el estado que se publica hacia el backend para pintar el recuadro de
+# cada trabajador en la vista de cámara. El motor toma la decisión de color a
+# partir de la peor gravedad presente:
+#   sin infracciones            -> CONFORME    (verde)
+#   sólo ausencias INTERMEDIO   -> INTERMEDIO  (naranja)
+#   cualquier ausencia GRAVE,
+#   o cualquier IMPOSTOR        -> CRITICO     (rojo)
+cuadro:
+  # Cuántos frames se acumulan antes de republicar el cuadro. El cuadro es
+  # estado de pantalla, no historial: refrescarlo más rápido que esto solo
+  # genera tráfico sin aportar información nueva.
+  intervalo_fotogramas: 2
+  # Publicar el frame ya anotado para que la vista /camara muestre el video del
+  # motor. Necesario porque la webcam solo puede estar en un proceso a la vez: si
+  # el motor no la tiene, el navegador puede abrirla; si el motor la tiene, el
+  # navegador recibe "Could not start video source".
+  publicar_frame: true
+  # Ancho maximo del frame publicado. 960 basta para leer el texto de los
+  # recuadros y mantiene el POST por debajo de ~80 KB en JPEG, que es lo que
+  # hace viable enviarlo cada pocas decimas de segundo.
+  ancho_maximo: 960
+  # Tracks que no han producido nada durante estos segundos se retiran del
+  # cuadro (la persona salió de cámara o perdió el seguimiento).
+  expiracion_segundos: 8.0
+  # Incluir las cajas de las personas en el payload, para poder dibujar el
+  # recuadro sobre el video aunque el backend no sepa nada de píxeles.
+  incluir_cajas: true

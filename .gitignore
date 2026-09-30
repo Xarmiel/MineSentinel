@@ -4,3 +4,10 @@ __pycache__/
 **/.venv/
 **/__pycache__/
 *.py[cod]
+
+*.avi
+runs/
+__pycache__/
+yolov8s.pt
+yolov8n.pt
+args.yaml

@@ -22,28 +22,27 @@ modelo:
     pesos: "yolov8n.pt"
     clases: ["person"]
 
-  # Modelo principal de EPP. Solo aporta elementos (casco, chaleco, gafas...).
+  # Modelo principal de EPP. Pesos propios entrenados en local.
+  # `ruta` tiene prioridad sobre `repo_hf` en DetectorEPP._resolver_pesos(),
+  # así que con esta clave no se descarga nada de HuggingFace.
+  # Clases del modelo: 0 = gloves, 1 = goggles (sólo gafas y guantes).
+  # No se declara `clases_persona`: el anclaje de personas lo aporta el bloque
+  # `personas:` de arriba, y este modelo no tiene clase de persona.
   principal:
-    nombre: "vyra-ppe"
-    repo_hf: "Hexmon/vyra-yolo-ppe-detection"
-    archivo: "best.pt"
-    # Clases que este modelo considera "persona". Sólo se usan si el bloque
-    # `personas:` de arriba está ausente.
-    clases_persona: ["person"]
+    nombre: "epp-mina"
+    ruta: "C:/Users/eduar/Downloads/runs/detect/train/weights/best.pt"
 
   # Modelos que se ejecutan además del principal y cuyas detecciones se fusionan.
-  # Se usan para cubrir elementos que el modelo principal no distingue
-  # (aquí, el calzado de seguridad: "shoes" / "no_shoes").
-  adicionales:
-    - nombre: "keremberke-ppe"
-      repo_hf: "keremberke/yolov8s-protective-equipment-detection"
-      archivo: "best.pt"
-    # Para usar pesos propios, comenta el bloque anterior y usa rutas locales:
-    # - nombre: "epp-mina"
-    #   ruta: "C:/modelos/best.pt"
+  # Vacío: el modelo propio cubre las dos únicas clases que este cliente vigila.
+  # Para recuperar el calzado de seguridad hay que descomentar el bloque de
+  # abajo y volver a marcar el mapeo de BOTAS como verificable en el catálogo.
+  adicionales: []
+  #  - nombre: "keremberke-ppe"
+  #    repo_hf: "keremberke/yolov8s-protective-equipment-detection"
+  #    archivo: "best.pt"
 
   imgsz: 640
-  confianza: 0.35          # umbral de confianza por detección
+  confianza: 0.20          # umbral de confianza por detección
   iou: 0.45                # umbral de IoU para el NMS interno de cada modelo
   device: "cpu"            # "cuda:0" si hay GPU NVIDIA disponible
 
@@ -56,6 +55,9 @@ asignacion:
   margen_y: 0.10
   # Si un EPP queda sin persona asignada, se reporta como hallazgo suelto
   # sólo cuando supera esta confianza (evita ruido con detecciones lejanas).
+  # NO afecta al modelo propio: gloves y goggles se mapean a CONFORME, y una
+  # detección conforme sin dueño nunca genera alerta. Sólo gobierna las clases
+  # de ausencia explícita (no_*) e impostores, que este modelo no tiene.
   confianza_suelto: 0.60
 
 # =============================================================================
@@ -80,12 +82,16 @@ catalogo_epp:
     nombre: "Casco de Seguridad con Barbiquejo"
     tipo: "CONFORME"
     gravedad: "GRAVE"
-    verificable: true
+    # Ningún modelo cargado detecta casco. Marcado como no verificable para
+    # que el motor NO infiera "falta casco" a partir de una ausencia de cajas.
+    # Vuelve a true cuando haya un modelo que lo vea.
+    verificable: false
   CHALECO:
     nombre: "Chaleco Reflectivo de Alta Visibilidad"
     tipo: "CONFORME"
     gravedad: "INTERMEDIO"
-    verificable: true
+    # Ídem: el modelo propio no distingue chaleco.
+    verificable: false
   GAFAS:
     nombre: "Gafas de Seguridad / Protectoras"
     tipo: "CONFORME"
@@ -100,12 +106,15 @@ catalogo_epp:
     nombre: "Mascarilla / Respirador contra Polvo"
     tipo: "CONFORME"
     gravedad: "INTERMEDIO"
-    verificable: true
+    # Ningún modelo cargado detecta mascarilla. No es obligatorio en ningún rol,
+    # pero se marca igual para que el catálogo no prometa lo que no se ve.
+    verificable: false
   BOTAS:
     nombre: "Botas de Seguridad con Puntera de Acero"
     tipo: "CONFORME"
     gravedad: "GRAVE"
-    verificable: true
+    # Ídem: el modelo propio cubre sólo gafas y guantes.
+    verificable: false
   LAMPARA:
     nombre: "Lámpara Minera Frontal"
     tipo: "CONFORME"
@@ -218,7 +227,11 @@ emision:
   # de permitir un nuevo reporte. Filtra falsos positivos de un solo frame.
   frames_estables: 5
   # Confianza mínima para que una ausencia sin evidencia directa genere alerta.
-  confianza_minima_alerta: 0.45
+  # No filtra detecciones: es el valor que se REPORTA como nivelConfianza cuando
+  # el motor infiere una ausencia sin caja que la respalde. Bajado a 0.30 para
+  # que no se atribuya al backend más certeza de la que el modelo realmente
+  # tiene en las gafas (~0.30).
+  confianza_minima_alerta: 0.30
 
 # =============================================================================
 # CUADRO DE CUMPLIMIENTO (vista en vivo por persona)

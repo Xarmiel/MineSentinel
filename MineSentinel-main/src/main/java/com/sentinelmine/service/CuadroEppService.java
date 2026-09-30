@@ -82,6 +82,7 @@ public class CuadroEppService {
         payload.put("fps", cuadro.getFps());
         payload.put("dimensiones", cuadro.getDimensiones());
         payload.put("personas", cuadro.getPersonas() != null ? cuadro.getPersonas() : List.of());
+        payload.put("simulacion", Boolean.TRUE.equals(cuadro.getSimulacion()));
         payload.put("servidor", LocalDateTime.now().toString());
         payload.put("vigente", hayCuadroVigente());
         return payload;

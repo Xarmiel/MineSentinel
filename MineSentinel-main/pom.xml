@@ -18,7 +18,7 @@
     <description>Prototipo Mine's Sentinel - Sistema de seguridad minera (EPP + Aforo + Alertas)</description>
 
     <properties>
-        <java.version>25</java.version>
+        <java.version>17</java.version>
     </properties>
 
     <dependencies>
@@ -69,12 +69,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
-                    <release>25</release>
+                    <release>${java.version}</release>
                     <parameters>true</parameters>
-                    <compilerArgs>
-                        <arg>--release</arg>
-                        <arg>25</arg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
             <plugin>

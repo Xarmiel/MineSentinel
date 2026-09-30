@@ -36,6 +36,8 @@
             <span class="cuadro-estado" id="cuadroEstado">Sin señal del motor de visión</span>
         </div>
 
+        <div class="aviso-motor" id="avisoMotor"></div>
+
         <table class="cuadro-tabla" id="cuadroTabla">
             <thead>
             <tr>
@@ -88,6 +90,7 @@
 
     const cuerpoCuadro = document.getElementById('cuadroCuerpo');
     const estadoCuadro = document.getElementById('cuadroEstado');
+    const avisoMotor = document.getElementById('avisoMotor');
 
     function escapar(texto) {
         const d = document.createElement('div');
@@ -95,8 +98,32 @@
         return d.innerHTML;
     }
 
+    // El modo simulación del cliente publica datos fabricados sin ejecutar
+    // YOLOv8, así que nunca manda frame ni detecciones. Sin este aviso la vista
+    // queda igual que cuando el detector sí funciona pero no ve a nadie, y el
+    // diagnóstico se va por el camino equivocado.
+    function mostrarAvisoSimulacion(activo) {
+        if (!avisoMotor) return;
+        avisoMotor.className = activo ? 'aviso-motor visible' : 'aviso-motor';
+        avisoMotor.innerHTML = activo
+            ? '<strong>Modo simulación activo.</strong> El cliente está publicando-events ' +
+              'fabricados: <strong>no se ejecuta YOLOv8 y no se captura vídeo</strong>, por eso no hay ' +
+              'recuadros ni imagen. Para ver la detección real en esta vista, detén el cliente y relánzalo ' +
+              'desde <code>python_client\\</code> con <code>--mode webcam --src 0</code>.'
+            : '';
+    }
+
     function pintarCuadro(cuadro) {
         const personas = (cuadro && cuadro.personas) || [];
+        mostrarAvisoSimulacion(!!(cuadro && cuadro.simulacion));
+
+        if (cuadro && cuadro.simulacion) {
+            cuerpoCuadro.innerHTML =
+                '<tr class="cuadro-vacio"><td colspan="5">Sin detecciones: el motor de visión no está ejecutándose</td></tr>';
+            estadoCuadro.textContent = 'Simulación · sin YOLOv8';
+            estadoCuadro.className = 'cuadro-estado simulacion';
+            return;
+        }
 
         if (!personas.length) {
             cuerpoCuadro.innerHTML =

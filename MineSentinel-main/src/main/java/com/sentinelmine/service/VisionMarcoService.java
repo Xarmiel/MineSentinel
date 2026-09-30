@@ -65,7 +65,9 @@ public class VisionMarcoService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("vigente", vigente());
         m.put("bytes", ultimo != null ? ultimo.length : 0);
-        m.put("recibido", Instant.now().toString());
+        m.put("recibido", recibido.toString());
+        m.put("msDesdeUltimoFrame", ultimo == null ? -1
+                : Math.max(0, System.currentTimeMillis() - recibido.toEpochMilli()));
         m.put("cuadroVigente", cuadroEppService.hayCuadroVigente());
         return m;
     }
