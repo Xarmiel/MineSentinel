@@ -30,7 +30,7 @@ modelo:
   # `personas:` de arriba, y este modelo no tiene clase de persona.
   principal:
     nombre: "epp-mina"
-    ruta: "C:/Users/eduar/Downloads/runs/detect/train/weights/best.pt"
+    ruta: "C:/Users/eduar/Downloads/MineSentinel-main/MineSentinel-main/python_client/best_sentinel_v2.pt"
 
   # Modelos que se ejecutan además del principal y cuyas detecciones se fusionan.
   # Vacío: el modelo propio cubre las dos únicas clases que este cliente vigila.
