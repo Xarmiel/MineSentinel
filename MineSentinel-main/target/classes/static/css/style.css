@@ -101,6 +101,10 @@ body { background: #f5f4f0; color: #1c1c1c; }
 .cuadro-tabla tbody tr:hover { background: #171b23; }
 .cuadro-vacio td { text-align: center; color: #6b7280; padding: 1.2rem; font-style: italic; }
 .cuadro-conformes { color: #86efac; }
+/* "3 / 4": el numerador va en claro y el total atenuado, para que la cifra que
+   decide si hay que acercarse se lea antes que el denominador. */
+.cuadro-progreso { white-space: nowrap; color: #7d8390; }
+.cuadro-progreso strong { color: #e6e6e6; font-size: .85rem; }
 
 .chip { display: inline-block; padding: .12rem .5rem; border-radius: 999px; font-size: .65rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap; }
 .chip.conforme { background: #14532d; color: #86efac; }

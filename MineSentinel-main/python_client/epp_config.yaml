@@ -25,17 +25,20 @@ modelo:
   # Modelo principal de EPP. Pesos propios entrenados en local.
   # `ruta` tiene prioridad sobre `repo_hf` en DetectorEPP._resolver_pesos(),
   # así que con esta clave no se descarga nada de HuggingFace.
-  # Clases del modelo: 0 = gloves, 1 = goggles (sólo gafas y guantes).
+  # La ruta es RELATIVA a este archivo: se resuelve contra el directorio de
+  # epp_config.yaml, no contra el directorio desde el que se lance el cliente.
+  # Clases del modelo: 0 = gloves, 1 = goggles, 2 = helmet, 3 = vest.
   # No se declara `clases_persona`: el anclaje de personas lo aporta el bloque
   # `personas:` de arriba, y este modelo no tiene clase de persona.
   principal:
     nombre: "epp-mina"
-    ruta: "C:/Users/eduar/Downloads/MineSentinel-main/MineSentinel-main/python_client/best_sentinel_v2.pt"
+    ruta: "best_sentinel_v2.pt"
 
   # Modelos que se ejecutan además del principal y cuyas detecciones se fusionan.
-  # Vacío: el modelo propio cubre las dos únicas clases que este cliente vigila.
-  # Para recuperar el calzado de seguridad hay que descomentar el bloque de
-  # abajo y volver a marcar el mapeo de BOTAS como verificable en el catálogo.
+  # Vacío: el modelo propio ya cubre las cuatro clases vigiladas
+  # (gafas, guantes, casco y chaleco). Para recuperar el calzado de seguridad
+  # hay que descomentar el bloque de abajo y volver a marcar el mapeo de BOTAS
+  # como verificable en el catálogo.
   adicionales: []
   #  - nombre: "keremberke-ppe"
   #    repo_hf: "keremberke/yolov8s-protective-equipment-detection"
@@ -55,9 +58,10 @@ asignacion:
   margen_y: 0.10
   # Si un EPP queda sin persona asignada, se reporta como hallazgo suelto
   # sólo cuando supera esta confianza (evita ruido con detecciones lejanas).
-  # NO afecta al modelo propio: gloves y goggles se mapean a CONFORME, y una
-  # detección conforme sin dueño nunca genera alerta. Sólo gobierna las clases
-  # de ausencia explícita (no_*) e impostores, que este modelo no tiene.
+  # NO afecta al modelo propio: sus cuatro clases (gloves, goggles, helmet,
+  # vest) se mapean a CONFORME, y una detección conforme sin dueño nunca
+  # genera alerta. Sólo gobierna las clases de ausencia explícita (no_*) e
+  # impostores, que este modelo no tiene.
   confianza_suelto: 0.60
 
 # =============================================================================
@@ -82,16 +86,16 @@ catalogo_epp:
     nombre: "Casco de Seguridad con Barbiquejo"
     tipo: "CONFORME"
     gravedad: "GRAVE"
-    # Ningún modelo cargado detecta casco. Marcado como no verificable para
-    # que el motor NO infiera "falta casco" a partir de una ausencia de cajas.
-    # Vuelve a true cuando haya un modelo que lo vea.
-    verificable: false
+    # Verificable: el modelo `epp-mina` expone la clase `helmet` (id 2), mapeada
+    # a CASCO en `mapeo_clases`. Al no detectar casco en un track se emite
+    # alerta FALTANTE, que es exactamente el caso de uso principal de la mina.
+    verificable: true
   CHALECO:
     nombre: "Chaleco Reflectivo de Alta Visibilidad"
     tipo: "CONFORME"
     gravedad: "INTERMEDIO"
-    # Ídem: el modelo propio no distingue chaleco.
-    verificable: false
+    # Verificable: el modelo `epp-mina` expone la clase `vest` (id 3).
+    verificable: true
   GAFAS:
     nombre: "Gafas de Seguridad / Protectoras"
     tipo: "CONFORME"
@@ -113,7 +117,8 @@ catalogo_epp:
     nombre: "Botas de Seguridad con Puntera de Acero"
     tipo: "CONFORME"
     gravedad: "GRAVE"
-    # Ídem: el modelo propio cubre sólo gafas y guantes.
+    # Ídem: el modelo propio no tiene clase de calzado. Se mantiene en false
+    # para no declarar "falta botas" a quien el sistema no puede observar.
     verificable: false
   LAMPARA:
     nombre: "Lámpara Minera Frontal"

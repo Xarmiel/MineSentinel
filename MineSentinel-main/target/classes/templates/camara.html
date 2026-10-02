@@ -43,6 +43,7 @@
             <tr>
                 <th>Track</th>
                 <th>Estado</th>
+                <th>EPP</th>
                 <th>EPP conforme</th>
                 <th>Elementos no detectados / no aptos</th>
                 <th>Confianza</th>
@@ -50,7 +51,7 @@
             </thead>
             <tbody id="cuadroCuerpo">
             <tr class="cuadro-vacio">
-                <td colspan="5">Esperando detections del motor YOLOv8…</td>
+                <td colspan="6">Esperando detections del motor YOLOv8…</td>
             </tr>
             </tbody>
         </table>
@@ -79,7 +80,7 @@
 </main>
 </body>
 <script type="module">
-    // =====================================================================
+// =====================================================================
     // 1. CUADRO DE CUMPLIMIENTO (SSE) - datos del motor YOLOv8 real
     // =====================================================================
     const ETIQUETA = {
@@ -88,14 +89,45 @@
         CRITICO: 'CRÍTICO'
     };
 
+    // Mismos colores que .chip / .leyenda-dot en style.css, para que el recuadro
+    // sobre el vídeo y la fila de la tabla signalen exactamente lo mismo.
+    const COLOR_ESTADO = {
+        CONFORME: '#22c55e',
+        INTERMEDIO: '#f97316',
+        CRITICO: '#ef4444'
+    };
+
+    // Lo más grave primero. En el vídeo manda el solape de cajas; en la tabla,
+    // que el supervisor recorre de arriba abajo, es lo que decide si repara en
+    // la última fila.
+    const ORDEN_ESTADO = { CRITICO: 0, INTERMEDIO: 1, CONFORME: 2 };
+
     const cuerpoCuadro = document.getElementById('cuadroCuerpo');
     const estadoCuadro = document.getElementById('cuadroEstado');
     const avisoMotor = document.getElementById('avisoMotor');
+
+    // Último cuadro recibido. La tabla se repinta en cada evento SSE, pero el
+    // recuadro sobre el vídeo también se redibuja cuando llega una imagen
+    // nueva: el frame y el cuadro viajan por caminos distintos y a cadencia
+    // distinta, así que se guardan por separado y se cruzan al pintar.
+    let ultimoCuadro = null;
 
     function escapar(texto) {
         const d = document.createElement('div');
         d.textContent = texto == null ? '' : String(texto);
         return d.innerHTML;
+    }
+
+    function estadoDe(persona) {
+        return (persona.estado || 'CONFORME').toUpperCase();
+    }
+
+    function ordenarPorGravedad(personas) {
+        return personas.slice().sort((a, b) => {
+            const ea = ORDEN_ESTADO[estadoDe(a)] != null ? ORDEN_ESTADO[estadoDe(a)] : 3;
+            const eb = ORDEN_ESTADO[estadoDe(b)] != null ? ORDEN_ESTADO[estadoDe(b)] : 3;
+            return ea !== eb ? ea - eb : (a.trackId || 0) - (b.trackId || 0);
+        });
     }
 
     // El modo simulación del cliente publica datos fabricados sin ejecutar
@@ -118,30 +150,43 @@
         mostrarAvisoSimulacion(!!(cuadro && cuadro.simulacion));
 
         if (cuadro && cuadro.simulacion) {
+            ultimoCuadro = null;
+            limpiarOverlay();
             cuerpoCuadro.innerHTML =
-                '<tr class="cuadro-vacio"><td colspan="5">Sin detecciones: el motor de visión no está ejecutándose</td></tr>';
+                '<tr class="cuadro-vacio"><td colspan="6">Sin detecciones: el motor de visión no está ejecutándose</td></tr>';
             estadoCuadro.textContent = 'Simulación · sin YOLOv8';
             estadoCuadro.className = 'cuadro-estado simulacion';
             return;
         }
 
         if (!personas.length) {
+            ultimoCuadro = cuadro || null;
+            limpiarOverlay();
             cuerpoCuadro.innerHTML =
-                '<tr class="cuadro-vacio"><td colspan="5">Sin trabajadores en cámara</td></tr>';
+                '<tr class="cuadro-vacio"><td colspan="6">Sin trabajadores en cámara</td></tr>';
             estadoCuadro.textContent = 'Motor conectado · 0 personas';
             estadoCuadro.className = 'cuadro-estado';
             return;
         }
 
+        ultimoCuadro = cuadro;
+        const ordenadas = ordenarPorGravedad(personas);
         const conteo = { CONFORME: 0, INTERMEDIO: 0, CRITICO: 0 };
         personas.forEach(p => {
-            const clave = (p.estado || 'CONFORME').toUpperCase();
+            const clave = estadoDe(p);
             conteo[clave] = (conteo[clave] || 0) + 1;
         });
 
-        cuerpoCuadro.innerHTML = personas.map(p => {
-            const clave = (p.estado || 'CONFORME').toUpperCase();
+        cuerpoCuadro.innerHTML = ordenadas.map(p => {
+            const clave = estadoDe(p);
             const conformes = (p.conformes || []).join(', ') || '—';
+            const obligatorios = (p.obligatorios || []).length;
+
+            // "3/4" responde de un vistazo a lo que el supervisor quiere saber:
+            // no qué lleva puesto, sino cuánto le falta de lo que debía.
+            const progreso = obligatorios
+                ? '<strong>' + (p.conformes || []).length + '</strong> / ' + obligatorios
+                : '—';
 
             const faltantes = (p.faltantes || []).map(f => {
                 const g = (f.gravedad || 'INTERMEDIO').toUpperCase();
@@ -155,6 +200,7 @@
             return '<tr>' +
                 '<td><strong>#' + escapar(p.trackId) + '</strong></td>' +
                 '<td><span class="chip ' + clave.toLowerCase() + '">' + escapar(ETIQUETA[clave] || clave) + '</span></td>' +
+                '<td class="cuadro-progreso">' + progreso + '</td>' +
                 '<td class="cuadro-conformes">' + escapar(conformes) + '</td>' +
                 '<td>' + faltantes + '</td>' +
                 '<td>' + conf + '</td>' +
@@ -166,6 +212,8 @@
             conteo.INTERMEDIO + ' intermedios / ' +
             conteo.CONFORME + ' conformes';
         estadoCuadro.className = 'cuadro-estado en-linea';
+
+        pintarOverlay();
     }
 
     function conectarCuadro() {
@@ -192,8 +240,6 @@
         };
     }
 
-    conectarCuadro();
-
     // =====================================================================
     // 2. FRAME DEL MOTOR DE VISION
     // -----------------------------------------------------------------
@@ -213,12 +259,127 @@
     const overlay = document.getElementById('overlayCamara');
     let hayFrame = false;
 
+    // -----------------------------------------------------------------
+    // 2.1. RECUADROS DE CUMPLIMIENTO SOBRE EL VIDEO
+    // -----------------------------------------------------------------
+    // El motor ya dibuja las cajas de EPP en el JPEG que publica, pero no las
+    // de las personas: el color por estado que usa el supervisor para decidir
+    // se calcula en el navegador, a partir del `caja` y el `estado` de cada fila del
+    // cuadro. Sin esto el canvas quedaba vacío y la vista perdía la única
+    // señal que permite actuar sin mirar la tabla.
+    function limpiarOverlay() {
+        if (!overlay) return;
+        overlay.width = 0;
+        overlay.height = 0;
+    }
+
+    // El motor analiza el frame ORIGINAL y serializa `caja` en sus píxeles, pero
+    // luego reescala la imagen anotada a `ancho_maximo` antes de subirla
+    // (ver _publicar_frame en yolo_sentinel_client.py). Encima, el <img> usa
+    // `object-fit: cover`, así que el navegador puede recortar los bordes de la
+    // imagen. Las cajas sólo caen en su sitio si se mapperan por la geometría
+    // real de la imagen, no con un factor único ingenuo.
+    function escalaCajas() {
+        const anchoNatural = marcoMotor.naturalWidth;
+        const altoNatural = marcoMotor.naturalHeight;
+        if (!anchoNatural || !altoNatural) return null;
+
+        const caja = overlay.getBoundingClientRect();
+        if (!caja.width || !caja.height) return null;
+
+        // `cover` = la imagen escala hasta cubrir el contenedor y se recorta por
+        // el centro; por eso el desplazamiento sale negativo en el eje recortado.
+        const escala = Math.max(caja.width / anchoNatural, caja.height / altoNatural);
+
+        const dim = (ultimoCuadro && ultimoCuadro.dimensiones) || null;
+        // `dimensiones` es el tamaño del frame sobre el que el motor calculó las
+        // cajas. Si no llega (cliente viejo o cuadro a medio construir) se asume
+        // que ya viene en los píxeles de la imagen publicada.
+        const refAncho = (Array.isArray(dim) && dim[0]) || anchoNatural;
+        const refAlto = (Array.isArray(dim) && dim[1]) || altoNatural;
+
+        return {
+            fx: (anchoNatural / refAncho) * escala,
+            fy: (altoNatural / refAlto) * escala,
+            dx: (caja.width - anchoNatural * escala) / 2,
+            dy: (caja.height - altoNatural * escala) / 2
+        };
+    }
+
+    function pintarOverlay() {
+        if (!overlay) return;
+        const personas = (ultimoCuadro && ultimoCuadro.personas) || [];
+        if (!hayFrame || !personas.length) {
+            limpiarOverlay();
+            return;
+        }
+
+        const caja = overlay.getBoundingClientRect();
+        if (!caja.width || !caja.height) return;
+
+        // El canvas se dimensiona en píxeles físicos: usar el tamaño CSS tal cual
+        // deja el trazo borroso en pantallas HiDPI y duplica el trabajo de pintado.
+        const dpr = window.devicePixelRatio || 1;
+        const ancho = Math.round(caja.width * dpr);
+        const alto = Math.round(caja.height * dpr);
+        if (overlay.width !== ancho || overlay.height !== alto) {
+            overlay.width = ancho;
+            overlay.height = alto;
+        }
+
+        const ctx = overlay.getContext('2d');
+        if (!ctx) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, caja.width, caja.height);
+
+        const m = escalaCajas();
+        if (!m) return;
+
+        ctx.lineWidth = 2;
+        ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+        ctx.textBaseline = 'top';
+
+        ordenarPorGravedad(personas).forEach(p => {
+            const c = p.caja;
+            if (!Array.isArray(c) || c.length < 4) return;
+
+            const clave = estadoDe(p);
+            const color = COLOR_ESTADO[clave] || '#9aa0ab';
+            const x = c[0] * m.fx + m.dx;
+            const y = c[1] * m.fy + m.dy;
+            const w = Math.max(2, (c[2] - c[0]) * m.fx);
+            const h = Math.max(2, (c[3] - c[1]) * m.fy);
+
+            ctx.strokeStyle = color;
+            ctx.strokeRect(x, y, w, h);
+
+            // La etiqueta lleva el track y cuántos elementos faltan: el color
+            // dice la gravedad, el número dice si hay que acercarse a mirar.
+            const faltantes = (p.faltantes || []).length;
+            const texto = '#' + (p.trackId != null ? p.trackId : '?') +
+                (faltantes ? ' · ' + faltantes : ' ✓');
+
+            const anchoTexto = ctx.measureText(texto).width;
+            // Encima de la caja salvo que se salga por arriba; en ese caso, dentro.
+            const etiquetaY = y >= 16 ? y - 16 : y + 1;
+            ctx.fillStyle = color;
+            ctx.fillRect(x, etiquetaY, anchoTexto + 8, 15);
+            ctx.fillStyle = '#0b0e14';
+            ctx.fillText(texto, x + 4, etiquetaY + 2);
+        });
+    }
+
+    // La imagen y el cuadro llegan por vías independientes, así que el overlay se
+    // repinta cuando aparece cada frame nuevo y también al cambiar el tamaño de
+    // la ventana: en móvil, al rotar, las cajas se descuadrarían si no.
+    marcoMotor.addEventListener('load', pintarOverlay);
+    window.addEventListener('resize', pintarOverlay);
+
     function mostrarPlaceholder(mensaje) {
         hayFrame = false;
         marcoMotor.removeAttribute('src');
         marcoMotor.style.display = 'none';
-        overlay.width = 0;
-        overlay.height = 0;
+        limpiarOverlay();
         placeholderCamara.style.display = 'flex';
         textoCamara.textContent = mensaje;
         setEstado('Estado: sin senal del motor');
@@ -266,5 +427,11 @@
     const cadenciaFrame = 700;
     pedirFrame();
     setInterval(pedirFrame, cadenciaFrame);
+
+    // Se conecta al final y no al declarar la función: pintarCuadro() toca el
+    // overlay, que aún no existe como elemento hasta que se declara `overlay`
+    // más arriba. Sus callbacks llegan de forma asíncrona, pero dejarla al final
+    // evita depender de ese detalle.
+    conectarCuadro();
 </script>
 </html>

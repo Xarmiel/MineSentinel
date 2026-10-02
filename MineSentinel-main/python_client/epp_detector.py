@@ -202,6 +202,10 @@ class DetectorEPP:
         import yaml  # import diferido: mensaje de error más claro
 
         self.config_path = config_path
+        # Directorio del config: ancla de todas las rutas relativas declaradas en
+        # él, para que el cliente se pueda lanzar desde cualquier carpeta de
+        # trabajo sin depender del CWD.
+        self._base_dir = os.path.dirname(os.path.abspath(config_path))
         with open(config_path, "r", encoding="utf-8") as fh:
             self.cfg: Dict[str, Any] = yaml.safe_load(fh) or {}
 
@@ -282,12 +286,24 @@ class DetectorEPP:
 
         return indice
 
+    def _ruta_local(self, ruta: str) -> str:
+        """Resuelve una ruta declarada en el config contra su propio directorio.
+
+        Las absolutas se respetan tal cual; las relativas se anclan al directorio
+        de `epp_config.yaml`, de modo que mover el proyecto no rompe el cliente.
+        """
+        return ruta if os.path.isabs(ruta) else os.path.join(self._base_dir, ruta)
+
     def _resolver_pesos(self, definicion: Dict[str, Any]) -> str:
         """Devuelve una ruta local a los pesos, descargándolos de HuggingFace si hace falta."""
         ruta = definicion.get("ruta")
         if ruta:
+            ruta = self._ruta_local(ruta)
             if not os.path.isfile(ruta):
-                raise FileNotFoundError(f"No se encuentra el modelo local: {ruta}")
+                raise FileNotFoundError(
+                    f"No se encuentra el modelo local: {ruta} "
+                    f"(declarado como '{definicion.get('ruta')}' en {self.config_path})"
+                )
             return ruta
 
         repo = definicion.get("repo_hf")
@@ -320,7 +336,11 @@ class DetectorEPP:
         if personas_cfg:
             nombre = personas_cfg.get("nombre", "personas")
             pesos = personas_cfg.get("ruta") or personas_cfg.get("pesos") or "yolov8n.pt"
+            pesos = self._ruta_local(pesos)
             if not os.path.isfile(pesos):
+                # No está junto al config: se deja el nombre desnudo para que
+                # Ultralytics lo descargue a su caché global.
+                pesos = personas_cfg.get("ruta") or personas_cfg.get("pesos") or "yolov8n.pt"
                 logger.info("Descargando detector de personas: %s", pesos)
             modelo = YOLO(pesos)
             nombres = {normalizar_clase(n) for n in modelo.names.values()}

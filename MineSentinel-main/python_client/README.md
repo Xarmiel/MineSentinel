@@ -14,16 +14,21 @@ calzado civil).
 pip install -r requirements.txt
 ```
 
-Los pesos se descargan solos en la primera ejecución (~90 MB, cacheados por HuggingFace):
+Los pesos se resuelven en este orden: primero el archivo local declarado en
+`epp_config.yaml`, y sólo si no existe se descarga de HuggingFace.
 
-| Modelo | Repositorio | Aporta |
+| Modelo | Origen | Aporta |
 |---|---|---|
-| Personas | `yolov8n.pt` (Ultralytics, COCO) | cajas con `track_id` = ancla de aforo y cumplimiento |
-| EPP principal | `Hexmon/vyra-yolo-ppe-detection` (YOLOv8m) | casco, chaleco, gafas, guantes, máscara + sus clases `NO-*` |
-| EPP adicional | `keremberke/yolov8s-protective-equipment-detection` | calzado de seguridad (`shoes` / `no_shoes`) |
+| Personas | `yolov8n.pt` (local junto al config, o descarga de Ultralytics) | cajas con `track_id` = ancla de aforo y cumplimiento |
+| EPP principal | `best_sentinel_v2.pt` (entrenado en local) | `gloves`, `goggles`, `helmet`, `vest` |
+| EPP adicional | — (`adicionales: []`) | placeholder para un modelo de calzado |
 
-> Se fusionan los dos modelos de EPP porque ninguno cubre por sí solo todos los elementos:
-> el primero no distingue calzado y el segundo no distingue chaleco.
+> Las rutas de pesos del config son **relativas al propio `epp_config.yaml`**, no al
+> directorio desde el que se lance el cliente: se puede ejecutar desde cualquier carpeta.
+
+> `modelo.adicionales` está vacío porque el modelo propio ya cubre las cuatro clases
+> vigiladas. Para recuperar el calzado de seguridad hay que descomentar el bloque
+> `keremberke` del config y marcar `BOTAS` como `verificable: true`.
 
 ---
 
@@ -118,24 +123,48 @@ impostores:
 
 ### Elementos no verificables
 
-`LAMPARA` y `RESPIRADOR` están en el catálogo pero marcados `verificable: false`: ningún
-modelo público detecta una lámpara frontal o un respirador, así que el motor **nunca** genera
-una alerta por su ausencia. Es deliberado — evita alarmas constantes que nadie puede
-verificar en cámara.
+Sólo generan alerta los elementos que el modelo activo puede ver de verdad. Hoy son
+**cuatro**, los que expone `best_sentinel_v2.pt`:
+
+| Elemento | Clase del modelo | Verificable |
+|---|---|---|
+| `GUANTES` | `gloves` | sí |
+| `GAFAS` | `goggles` | sí |
+| `CASCO` | `helmet` | sí |
+| `CHALECO` | `vest` | sí |
+
+El resto del catálogo (`MASCARA`, `BOTAS`, `LAMPARA`, `RESPIRADOR`) está en
+`verificable: false`: ningún modelo cargado los detecta, así que el motor **nunca**
+genera una alerta por su ausencia, aunque el rol los exija. Al arrancar, el cliente
+avisa por consola de cada rol que exige algo no verificable.
+
+> `verificable: false` **no es cosmético**: apaga la alerta en dos sitios
+> (`epp_obligatorio` y `_evaluar_hallazgos`). El elemento se sigue detectando y se
+> sigue pintando en el cuadro, pero jamás dispara un aviso. Por eso hay tests que
+> lo vigilan (`tests/test_reglas_epp.py`): un `false` puesto por error no da ningún
+> error visible en producción, sólo la ausencia de avisos.
+
+Es deliberado — evita alarmas constantes que nadie puede verificar en cámara.
 
 ---
 
 ## 5. Limitaciones conocidas
 
-- **Ningún modelo público de EPP trae clases de "gorra", "gafas de sol" ni "zapatillas".**
-  Los modelos de dataset industrial sólo tienen `no_helmet`, `no_shoes`, etc., que cubren el
+- **El modelo propio no trae clases de "gorra", "gafas de sol" ni "zapatillas".**
+  Los datasets industriales suelen traer `no_helmet`, `no_shoes`, etc., que cubren el
   caso común (elemento simplemente ausente). El bloque `impostores:` ya está cableado y
-  funcionando: si entrenas tu propio modelo con esas clases y las declaras ahí, el motor las
+  funcionando: si entrenas un modelo con esas clases y las declaras ahí, el motor las
   reporta como `IMPOSTOR` sin tocar una línea de código.
-- La clase `no_helmet` se reporta como `FALTANTE`, no como `IMPOSTOR`, porque el modelo no
-  puede distinguir "cabeza desnuda" de "gorra puesta".
+- **El calzado no se vigila.** `BOTAS` es obligatorio en todos los roles, pero sigue en
+  `verificable: false` porque el modelo no tiene clase de calzado. Es la brecha conocida
+  entre lo que la mina exige y lo que el sistema puede ver.
+- Una clase `no_helmet` (o equivalente) se reporta como `FALTANTE`, no como `IMPOSTOR`,
+  porque el modelo no puede distinguir "cabeza desnuda" de "gorra puesta".
 - Los modelos de EPP se entrenan sobre recortes cerrados; por eso el detector de personas es
   un modelo COCO aparte. No esperes detecciones de EPP fiables a más de ~15 m de distancia.
+- Las cajas que se dibujan en `/camara` vienen del frame original mientras que la imagen
+  publicada va reescalada, y el `<img>` además recorta con `object-fit: cover`. El overlay
+  compensa ambas escalas; si se toca ese mapeo, `src/test/js/prueba-camara.mjs` lo detecta.
 
 ---
 
