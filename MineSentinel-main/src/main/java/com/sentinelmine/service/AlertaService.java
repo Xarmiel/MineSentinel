@@ -82,10 +82,29 @@ public class AlertaService {
 
     @Transactional(readOnly = true)
     public List<AlertaViewDTO> getAlertasRecientes(int limit) {
-        List<AlertaViewDTO> todas = getHistorialCompleto();
-        return todas.stream()
-                .limit(limit)
-                .toList();
+        List<FaltaEPP> faltas = faltaEPPRepository.findUltimasFaltas(PageRequest.of(0, limit));
+        List<AlertaViewDTO> resultado = new ArrayList<>();
+        for (FaltaEPP f : faltas) {
+            String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
+            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Operador";
+            String codTrabajador = f.getFaltaId() != null ? String.valueOf(10 + (f.getFaltaId() % 90)) : "16";
+            boolean notificado = f.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || f.getEstadoAlerta() == EstadoAlerta.REVISADA;
+
+            resultado.add(new AlertaViewDTO(
+                    f.getFaltaId(),
+                    "EPP",
+                    "Infracción de EPP detectada (" + rolNombre + ")",
+                    hora,
+                    "Sin " + eppNombre + " en el punto de control de ingreso.",
+                    codTrabajador,
+                    "media",
+                    false,
+                    notificado,
+                    f.getSnapshotUrl()
+            ));
+        }
+        return resultado;
     }
 
     @Transactional(readOnly = true)

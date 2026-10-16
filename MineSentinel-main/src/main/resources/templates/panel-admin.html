@@ -17,7 +17,7 @@
             <span id="badgeAforo" class="badge badge-success" th:text="${aforo.estado}">AFORO NORMAL</span>
         </div>
         <div class="aforo-numbers">
-            <div><span id="aforoActual" class="num num-green" th:text="${aforo.actual}">42</span><small>AFORO ACTUAL</small></div>
+            <div><span id="aforoActual" class="num num-green" th:text="${aforo.actual}">0</span><small>AFORO ACTUAL</small></div>
             <div><span id="aforoMaximo" class="num" th:text="${aforo.maximo}">50</span><small>MÁX. PERMITIDO</small></div>
             <div><span id="aforoMinimo" class="num" th:text="${aforo.minimo}">10</span><small>MÍNIMO</small></div>
         </div>
@@ -118,6 +118,36 @@
                 }
                 const elUltimo = document.getElementById('ultimoEvento');
                 if (elUltimo && data.ultimoEvento) elUltimo.textContent = data.ultimoEvento;
+            }
+
+            const resAlertas = await fetch('/api/v1/alertas/recientes?limit=5');
+            if (resAlertas.ok) {
+                const alertas = await resAlertas.json();
+                const elConteo = document.getElementById('badgeAlertasConteo');
+                if (elConteo) elConteo.textContent = alertas.length + ' eventos';
+                const contenedor = document.getElementById('contenedorAlertas');
+                if (contenedor && alertas.length > 0) {
+                    contenedor.innerHTML = alertas.map(a => `
+                        <div class="alerta ${a.prioridadAlta ? 'alerta-alta' : ''}">
+                            <div class="alerta-header">
+                                <strong>${a.tituloVisual || 'Infracción de EPP detectada'}</strong>
+                                <span class="hora">${a.horaFormateada || ''}</span>
+                            </div>
+                            <p>${a.descripcion || ''}</p>
+                            <div class="alerta-footer">
+                                <span class="tag">TRABAJADOR #${a.trabajadorCodigo || ''}</span>
+                                <span class="tag ${a.prioridadAlta ? 'tag-alta' : 'tag-media'}">Prioridad ${a.prioridadTexto || 'Media'}</span>
+                            </div>
+                            <form method="post" action="/panel-admin/notificar">
+                                <input type="hidden" name="idAlerta" value="${a.id}">
+                                <input type="hidden" name="tipoAlerta" value="${a.tipo}">
+                                <button type="submit" ${a.notificadoJefeTurno ? 'disabled' : ''}>
+                                    ${a.notificadoJefeTurno ? '✔ Jefe de turno notificado' : '📨 Notificar al Jefe de Turno'}
+                                </button>
+                            </form>
+                        </div>
+                    `).join('');
+                }
             }
         } catch (e) {
             console.debug('Error en refresco asíncrono admin:', e);

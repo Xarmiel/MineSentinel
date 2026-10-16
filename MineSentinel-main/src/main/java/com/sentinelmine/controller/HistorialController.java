@@ -31,7 +31,7 @@ public class HistorialController {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
+        model.addAttribute("turno", eventoTurnoService.obtenerTurnoTopbar());
         model.addAttribute("historial", alertaService.getHistorialCompleto());
         return "historial";
     }

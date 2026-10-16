@@ -253,6 +253,70 @@ public class EventoTurnoService {
                 .orElse("Relevo de guardia");
     }
 
+    /**
+     * Retorna exclusivamente el primer turno guardado o activo para la pestaña superior (Topbar).
+     */
+    @Transactional(readOnly = true)
+    public String obtenerTurnoTopbar() {
+        List<EventoTurno> activos = listarTurnosActivos();
+        if (!activos.isEmpty()) {
+            return activos.get(0).getTurno().getNombre();
+        }
+        return turnoRepository.findAll().stream()
+                .min((a, b) -> Long.compare(a.getTurnoId(), b.getTurnoId()))
+                .map(Turno::getNombre)
+                .orElse("Sin guardia activa");
+    }
+
+    /**
+     * Avanza al siguiente turno disponible en la tabla 'turnos',
+     * cerrando los turnos activos previos e iniciando el nuevo turno.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public EventoTurno pasarSiguienteTurno() {
+        List<Turno> turnos = turnoRepository.findAll().stream()
+                .sorted((a, b) -> Long.compare(a.getTurnoId(), b.getTurnoId()))
+                .toList();
+
+        if (turnos.isEmpty()) {
+            throw new IllegalStateException("No hay turnos registrados en la base de datos.");
+        }
+
+        List<EventoTurno> activos = listarTurnosActivos();
+        Long turnoActualId = null;
+        if (!activos.isEmpty()) {
+            turnoActualId = activos.get(0).getTurno().getTurnoId();
+            for (EventoTurno ev : activos) {
+                ev.setEstado(EstadoTurno.CERRADO);
+                ev.setFechaFin(LocalDateTime.now());
+                eventoTurnoRepository.save(ev);
+            }
+        }
+
+        Turno siguienteTurno = turnos.get(0);
+        if (turnoActualId != null) {
+            for (int i = 0; i < turnos.size(); i++) {
+                if (turnos.get(i).getTurnoId().equals(turnoActualId)) {
+                    siguienteTurno = turnos.get((i + 1) % turnos.size());
+                    break;
+                }
+            }
+        }
+
+        EventoTurno nuevoEvento = new EventoTurno(siguienteTurno, LocalDateTime.now());
+        nuevoEvento.setEstado(EstadoTurno.ACTIVO);
+        EventoTurno guardado = eventoTurnoRepository.save(nuevoEvento);
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("turno-update", guardado);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return guardado;
+    }
+
     @Transactional(readOnly = true)
     public EventoTurno obtenerPorId(Long eventoId) {
         return eventoTurnoRepository.findByIdWithTurno(eventoId)

@@ -26,14 +26,14 @@
                 <span id="badgeAforo" class="badge badge-success" th:text="${aforo.estado}">AFORO NORMAL</span>
             </div>
             <div class="aforo-numbers">
-                <div><span id="aforoActual" class="num num-green" th:text="${aforo.actual}">42</span><small>AFORO ACTUAL</small></div>
+                <div><span id="aforoActual" class="num num-green" th:text="${aforo.actual}">0</span><small>AFORO ACTUAL</small></div>
                 <div><span id="aforoMaximo" class="num" th:text="${aforo.maximo}">50</span><small>MÁX. PERMITIDO</small></div>
                 <div><span id="aforoMinimo" class="num" th:text="${aforo.minimo}">10</span><small>MÍNIMO</small></div>
             </div>
             <div class="progress-bar">
                 <div id="progressFill" class="progress-fill" th:style="'width:' + ${aforo.porcentaje} + '%'"></div>
             </div>
-            <p id="progressLabel" class="progress-label" th:text="${aforo.porcentaje} + '% de capacidad'">84% de capacidad</p>
+            <p id="progressLabel" class="progress-label" th:text="${aforo.porcentaje} + '% de capacidad'">0% de capacidad</p>
             <p class="ultimo-evento">Último cruce de línea virtual<br><span id="ultimoEvento" th:text="${aforo.ultimoEvento}"></span></p>
         </section>
 

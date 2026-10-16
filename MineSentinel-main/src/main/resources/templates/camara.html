@@ -64,7 +64,7 @@
         <form method="post" th:action="@{/camara/simular}">
             <label>Código de trabajador</label>
             <input type="text" name="codigoTrabajador" placeholder="16" required>
-            <button type="submit" class="btn btn-primary">Simular detección</button>
+            <button type="submit">Simular detección</button>
         </form>
 
         <div class="resultado" th:if="${resultado != null}">

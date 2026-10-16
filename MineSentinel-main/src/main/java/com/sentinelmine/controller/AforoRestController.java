@@ -93,6 +93,17 @@ public class AforoRestController {
         return ResponseEntity.ok(cierre);
     }
 
+    @PostMapping("/turnos/pasar")
+    public ResponseEntity<?> pasarTurno() {
+        EventoTurno nuevoTurno = eventoTurnoService.pasarSiguienteTurno();
+        aforoService.resetearAforo();
+        return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "turnoNombre", nuevoTurno.getTurno().getNombre(),
+                "eventoId", nuevoTurno.getEventoId()
+        ));
+    }
+
     @GetMapping("/turnos/activos")
     public ResponseEntity<List<EventoTurno>> listarTurnosActivos() {
         return ResponseEntity.ok(eventoTurnoService.listarTurnosActivos());
