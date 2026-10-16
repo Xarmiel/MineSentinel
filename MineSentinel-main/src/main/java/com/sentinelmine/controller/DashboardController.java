@@ -29,7 +29,7 @@ public class DashboardController {
             return "redirect:/login";
         }
 
-        String turnoDescripcion = eventoTurnoService.obtenerDescripcionTurnosActivos();
+        String turnoDescripcion = eventoTurnoService.obtenerTurnoTopbar();
         model.addAttribute("turno", turnoDescripcion);
         model.addAttribute("aforo", aforoService.toDTO());
         model.addAttribute("alertas", alertaService.getAlertasRecientes(3));

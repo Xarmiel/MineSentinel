@@ -36,7 +36,7 @@ public class CamaraController {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
+        model.addAttribute("turno", eventoTurnoService.obtenerTurnoTopbar());
         return "camara";
     }
 

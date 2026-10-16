@@ -15,7 +15,48 @@
             📥 Exportar Historial a CSV (Excel)
         </a>
     </div>
-    <table class="tabla-historial">
+
+    <!-- Barra de Filtros -->
+    <div style="background: #12151c; padding: 1rem; border-radius: 10px; margin-bottom: 1.2rem; display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: flex-end;">
+        <div style="flex: 1; min-width: 120px;">
+            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Hora</label>
+            <input type="text" id="filtroHora" placeholder="Ej: 14:30" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+        </div>
+        <div style="flex: 1; min-width: 130px;">
+            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Tipo</label>
+            <select id="filtroTipo" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+                <option value="">Todos</option>
+                <option value="EPP">EPP / Infracción</option>
+                <option value="ANOMALIA">Anomalía / Postura</option>
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 120px;">
+            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Trabajador</label>
+            <input type="text" id="filtroTrabajador" placeholder="Ej: 16" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+        </div>
+        <div style="flex: 1; min-width: 120px;">
+            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Prioridad</label>
+            <select id="filtroPrioridad" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+                <option value="">Todas</option>
+                <option value="Alta">Alta</option>
+                <option value="Media">Media</option>
+                <option value="Baja">Baja</option>
+            </select>
+        </div>
+        <div style="flex: 1; min-width: 120px;">
+            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Notificado</label>
+            <select id="filtroNotificado" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+                <option value="">Todos</option>
+                <option value="Sí">Sí</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div>
+            <button id="btnLimpiarFiltros" style="padding: 0.45rem 0.9rem; background: #232834; border: 1px solid #3b4252; border-radius: 6px; color: #c8cdd6; font-size: 0.8rem; cursor: pointer;">Limpiar</button>
+        </div>
+    </div>
+
+    <table class="tabla-historial" id="tablaHistorial">
         <thead>
         <tr>
             <th>#</th>
@@ -27,7 +68,7 @@
             <th>Notificado</th>
         </tr>
         </thead>
-        <tbody>
+        <tbody id="cuerpoHistorial">
         <tr th:each="a : ${historial}">
             <td th:text="${a.id}"></td>
             <td th:text="${a.horaFormateada}"></td>
@@ -40,5 +81,58 @@
         </tbody>
     </table>
 </main>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const inputHora = document.getElementById('filtroHora');
+        const selectTipo = document.getElementById('filtroTipo');
+        const inputTrabajador = document.getElementById('filtroTrabajador');
+        const selectPrioridad = document.getElementById('filtroPrioridad');
+        const selectNotificado = document.getElementById('filtroNotificado');
+        const btnLimpiar = document.getElementById('btnLimpiarFiltros');
+        const tbody = document.getElementById('cuerpoHistorial');
+        const filas = Array.from(tbody.querySelectorAll('tr'));
+
+        function aplicarFiltros() {
+            const valHora = inputHora.value.trim().toLowerCase();
+            const valTipo = selectTipo.value.trim().toLowerCase();
+            const valTrabajador = inputTrabajador.value.trim().toLowerCase();
+            const valPrioridad = selectPrioridad.value.trim().toLowerCase();
+            const valNotificado = selectNotificado.value.trim().toLowerCase();
+
+            filas.forEach(fila => {
+                const celdas = fila.querySelectorAll('td');
+                if (celdas.length < 7) return;
+
+                const textoHora = celdas[1].textContent.toLowerCase();
+                const textoTipo = celdas[2].textContent.toLowerCase();
+                const textoTrabajador = celdas[3].textContent.toLowerCase();
+                const textoPrioridad = celdas[5].textContent.toLowerCase();
+                const textoNotificado = celdas[6].textContent.toLowerCase();
+
+                const coincideHora = !valHora || textoHora.includes(valHora);
+                const coincideTipo = !valTipo || textoTipo.includes(valTipo);
+                const coincideTrabajador = !valTrabajador || textoTrabajador.includes(valTrabajador);
+                const coincidePrioridad = !valPrioridad || textoPrioridad === valPrioridad;
+                const coincideNotificado = !valNotificado || textoNotificado === valNotificado;
+
+                fila.style.display = (coincideHora && coincideTipo && coincideTrabajador && coincidePrioridad && coincideNotificado) ? '' : 'none';
+            });
+        }
+
+        [inputHora, selectTipo, inputTrabajador, selectPrioridad, selectNotificado].forEach(elem => {
+            elem.addEventListener('input', aplicarFiltros);
+            elem.addEventListener('change', aplicarFiltros);
+        });
+
+        btnLimpiar.addEventListener('click', () => {
+            inputHora.value = '';
+            selectTipo.value = '';
+            inputTrabajador.value = '';
+            selectPrioridad.value = '';
+            selectNotificado.value = '';
+            aplicarFiltros();
+        });
+    });
+</script>
 </body>
 </html>

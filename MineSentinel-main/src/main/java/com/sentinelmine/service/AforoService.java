@@ -97,6 +97,16 @@ public class AforoService {
         }
     }
 
+    @Transactional
+    public void resetearAforo() {
+        try {
+            movimientoAforoRepository.deleteAll();
+            ultimoEvento = "Aforo reiniciado a 0 - Sin movimientos";
+        } catch (Exception e) {
+            // Manejo defensivo
+        }
+    }
+
     @Transactional(readOnly = true)
     public int getAforoActual() {
         try {

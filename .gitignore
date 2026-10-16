@@ -9,5 +9,6 @@ __pycache__/
 runs/
 __pycache__/
 yolov8s.pt
-yolov8n.pt
 args.yaml
+target/
+**/target/

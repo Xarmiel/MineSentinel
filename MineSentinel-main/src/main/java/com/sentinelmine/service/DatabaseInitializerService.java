@@ -196,17 +196,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
                 RolPersonal rolPerforista = rolPersonalRepository.findAll().stream().findFirst().orElse(null);
                 CatalogoEPP eppCasco = catalogoEPPRepository.findAll().stream().findFirst().orElse(null);
 
-                // Sembrar movimientos iniciales de demostración para visualización en dashboard
-                if (rolPerforista != null) {
-                    for (int i = 0; i < 42; i++) {
-                        movimientoAforoRepository.save(new MovimientoAforo(
-                                eventoGuardado,
-                                rolPerforista,
-                                TipoMovimiento.ENTRADA,
-                                LocalDateTime.now().minusMinutes(120 - (i * 2))
-                        ));
-                    }
-                }
+                // Aforo inicial en 0 (sin sembrar movimientos artificiales de aforo)
 
                 // Sembrar alerta inicial de demostración
                 if (eppCasco != null) {

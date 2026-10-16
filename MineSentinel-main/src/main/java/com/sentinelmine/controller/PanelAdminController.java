@@ -44,7 +44,7 @@ public class PanelAdminController {
         if (session.getAttribute("usuario") == null) {
             return "redirect:/login";
         }
-        model.addAttribute("turno", eventoTurnoService.obtenerDescripcionTurnosActivos());
+        model.addAttribute("turno", eventoTurnoService.obtenerTurnoTopbar());
         model.addAttribute("aforo", aforoService.toDTO());
         model.addAttribute("alertas", alertaService.getAlertasRecientes(5));
         return "panel-admin";

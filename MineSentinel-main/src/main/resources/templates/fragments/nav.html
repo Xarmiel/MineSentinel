@@ -17,10 +17,49 @@
         <a th:href="@{/logout}">Salir</a>
     </nav>
     <div class="topbar-status">
-        <span class="pill" th:text="${turno}">Turno A · Guardia Noche</span>
+        <span class="pill" id="pillTurnoActual" th:text="${turno}">Turno A · Guardia Día (Mañana)</span>
+        <button type="button" id="btnPasarTurno" onclick="ejecutarPasarTurno()" class="btn-pasar-turno" style="background: #f6a623; color: #12151c; border: none; border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.72rem; font-weight: 700; cursor: pointer; margin-left: 0.4rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+            🔄 Pasar turno
+        </button>
         <span class="pill pill-warning">Analítica IA en pausa</span>
         <span class="pill pill-success">Sistema operativo</span>
     </div>
+    <script>
+        async function ejecutarPasarTurno() {
+            const btn = document.getElementById('btnPasarTurno');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Cambiando...';
+            }
+            try {
+                const res = await fetch('/api/v1/turnos/pasar', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    const pill = document.getElementById('pillTurnoActual');
+                    if (pill && data.turnoNombre) {
+                        pill.textContent = data.turnoNombre;
+                    }
+                    if (typeof refrescarDashboard === 'function') {
+                        await refrescarDashboard();
+                    } else if (typeof refrescarAdmin === 'function') {
+                        await refrescarAdmin();
+                    } else {
+                        window.location.reload();
+                    }
+                } else {
+                    alert('No se pudo cambiar el turno.');
+                }
+            } catch (err) {
+                console.error('Error al pasar turno:', err);
+                alert('Error al conectar con el servidor.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔄 Pasar turno';
+                }
+            }
+        }
+    </script>
 </header>
 </body>
 </html>
