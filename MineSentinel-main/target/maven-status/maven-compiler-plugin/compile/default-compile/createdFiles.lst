@@ -31,6 +31,7 @@ com\sentinelmine\dto\request\AnomaliaRequestDTO.class
 com\sentinelmine\service\BrowserLauncherService.class
 com\sentinelmine\entity\CatalogoEPP.class
 com\sentinelmine\dto\ResultadoDeteccionDTO.class
+com\sentinelmine\dto\request\InfraccionResolucionRequestDTO.class
 com\sentinelmine\service\AforoService.class
 com\sentinelmine\entity\AnomaliaMovimiento.class
 com\sentinelmine\service\MovimientoAforoService.class

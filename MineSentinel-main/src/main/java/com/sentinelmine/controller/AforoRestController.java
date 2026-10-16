@@ -4,6 +4,7 @@ import com.sentinelmine.dto.AforoDTO;
 import com.sentinelmine.dto.AlertaViewDTO;
 import com.sentinelmine.dto.request.AnomaliaRequestDTO;
 import com.sentinelmine.dto.request.FaltaEPPRequestDTO;
+import com.sentinelmine.dto.request.InfraccionResolucionRequestDTO;
 import com.sentinelmine.dto.request.MovimientoRequestDTO;
 import com.sentinelmine.dto.response.AforoGlobalResponseDTO;
 import com.sentinelmine.dto.response.CierreTurnoResponseDTO;
@@ -117,6 +118,17 @@ public class AforoRestController {
     public ResponseEntity<FaltaEPP> reportarInfraccionEPP(@Valid @RequestBody FaltaEPPRequestDTO request) {
         FaltaEPP falta = seguridadInfraccionService.registrarFaltaEPP(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(falta);
+    }
+
+    /**
+     * Cierre de ciclo de vida de una infracción: el motor de visión detectó que
+     * el trabajador volvió a portar el EPP que le faltaba. La falta pasa a
+     * RESUELTA y el panel admin la recibe por SSE vía `alerta-actualizada`.
+     */
+    @PostMapping("/seguridad/infracciones/resolucion")
+    public ResponseEntity<FaltaEPP> resolverInfraccionEPP(@Valid @RequestBody InfraccionResolucionRequestDTO request) {
+        FaltaEPP falta = seguridadInfraccionService.resolverFaltaEPP(request);
+        return ResponseEntity.ok(falta);
     }
 
     @PostMapping("/seguridad/anomalias")

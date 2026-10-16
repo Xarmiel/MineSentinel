@@ -218,7 +218,8 @@ class MotorDosHilos:
 
             # Todo lo que consume la IA se mantiene aqui, a su ritmo.
             self.pipeline._cruces_de_linea(analisis, frame.shape[0])
-            self.pipeline._reportar_infracciones(analisis)
+            self.pipeline._reportar_infracciones(analisis, incluir_epp=False)
+            self.pipeline._sincronizar_episodios(analisis)
             self.pipeline._publicar_cuadro(analisis)
 
             transcurrido = time.time() - self._t0_ia

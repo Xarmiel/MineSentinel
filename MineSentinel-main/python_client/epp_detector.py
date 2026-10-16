@@ -228,6 +228,10 @@ class DetectorEPP:
         self.enfriamiento = float(emision.get("enfriamiento_segundos", 90.0))
         self.frames_estables = int(emision.get("frames_estables", 5))
         self.confianza_minima_alerta = float(emision.get("confianza_minima_alerta", 0.45))
+        # Tracker de episodios del pipeline: cuántos frames consecutivos con
+        # falta antes de abrir una alerta, y cuántos sin falta antes de cerrarla.
+        self.frames_abrir = max(1, int(emision.get("frames_abrir", 3)))
+        self.frames_cerrar = max(1, int(emision.get("frames_cerrar", 8)))
 
         cuadro = self.cfg.get("cuadro", {}) or {}
         self.cuadro_intervalo = int(cuadro.get("intervalo_fotogramas", 10))

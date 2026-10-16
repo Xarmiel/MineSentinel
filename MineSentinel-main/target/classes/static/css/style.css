@@ -1,155 +1,393 @@
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
-body { background: #f5f4f0; color: #1c1c1c; }
+/* ==========================================================================
+   MineSentinel · hoja de estilos
+   Diseno limpio y profesional: fondo claro, tarjetas blancas, acento ambar
+   sobrio (industrial). Estados semanticos en tonos pastel sobre fondo claro.
+   ========================================================================== */
 
-/* LOGIN */
-.login-body { display: flex; align-items: center; justify-content: center; height: 100vh; background: #12151c; }
-.login-card { background: #1a1e27; padding: 2.5rem; border-radius: 12px; width: 340px; color: #e6e6e6; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
-.brand { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
-.brand-icon { background: #f6a623; padding: .4rem .6rem; border-radius: 8px; }
-.subtitle { color: #9aa0ab; font-size: .85rem; margin-bottom: 1.5rem; }
-.login-card label { display: block; margin-top: 1rem; font-size: .8rem; color: #9aa0ab; }
-.login-card input { width: 100%; padding: .6rem; margin-top: .3rem; border-radius: 6px; border: 1px solid #2b303b; background: #12151c; color: #fff; }
-.login-card button { width: 100%; margin-top: 1.5rem; padding: .7rem; background: #f6a623; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
-.error { color: #ef4444; font-size: .8rem; margin-top: .5rem; }
-.hint { margin-top: 1rem; font-size: .75rem; color: #5c6270; text-align: center; }
+:root {
+    /* Gris/greige calido: baja el brillo del blanco puro para que la vista
+       descanse, pero se mantiene claro y limpio. */
+    --bg: #d9d7d2;
+    --surface: #ebe9e4;
+    --surface-2: #e2e0da;
+    --border: #cfccc5;
+    --border-strong: #bab6ae;
+    --text: #2c2a27;
+    --text-soft: #57544e;
+    --text-muted: #8c877f;
+    --accent: #c2760a;
+    --accent-strong: #985c08;
+    --accent-soft: #efdcb8;
+    --success: #4e8f5e;
+    --success-strong: #3d7349;
+    --success-soft: #d3e6d6;
+    --warning: #b9791f;
+    --warning-strong: #915d14;
+    --warning-soft: #efddba;
+    --danger: #b64a46;
+    --danger-strong: #913a37;
+    --danger-soft: #eed2cf;
+    --neutral-soft: #e2e0da;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(40, 36, 30, .10), 0 1px 2px rgba(40, 36, 30, .06);
+    --shadow-md: 0 6px 18px rgba(40, 36, 30, .16);
+}
 
-/* TOPBAR */
-.topbar { display: flex; align-items: center; justify-content: space-between; background: #12151c; color: #fff; padding: .9rem 1.5rem; flex-wrap: wrap; gap: .75rem; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* --------------------------------------------------------------------------
+   Botones
+   -------------------------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .55rem 1.15rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background .15s ease, color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-primary:disabled { background: var(--border); color: var(--text-muted); cursor: default; }
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text-soft);
+    border-color: var(--border-strong);
+}
+.btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-soft); }
+.btn-secondary:disabled { background: var(--neutral-soft); color: var(--text-muted); border-color: var(--border); cursor: default; }
+.btn-block { width: 100%; }
+
+/* --------------------------------------------------------------------------
+   Login
+   -------------------------------------------------------------------------- */
+.login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+.login-card {
+    background: var(--surface);
+    padding: 2.5rem;
+    border-radius: var(--radius);
+    width: 360px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: .55rem; margin-bottom: .35rem; }
+.brand h1 { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+.brand-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    padding: .45rem .6rem;
+    border-radius: var(--radius-sm);
+    font-size: 1.05rem;
+    line-height: 1;
+}
+.subtitle { color: var(--text-muted); font-size: .85rem; margin-bottom: 1.5rem; }
+.login-card label { display: block; margin-top: 1rem; font-size: .8rem; font-weight: 600; color: var(--text-soft); }
+.login-card input {
+    width: 100%;
+    padding: .6rem .7rem;
+    margin-top: .3rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: .9rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.login-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.login-card .btn { width: 100%; margin-top: 1.5rem; padding: .7rem; }
+.error { color: var(--danger-strong); font-size: .8rem; margin-top: .5rem; }
+.hint { margin-top: 1rem; font-size: .75rem; color: var(--text-muted); text-align: center; }
+
+/* --------------------------------------------------------------------------
+   Barra superior
+   -------------------------------------------------------------------------- */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    color: var(--text);
+    padding: .85rem 1.5rem;
+    flex-wrap: wrap;
+    gap: .75rem;
+    border-bottom: 1px solid var(--border);
+}
 .topbar-left { display: flex; align-items: center; gap: .6rem; }
-.subtitle-small { font-size: .65rem; color: #9aa0ab; letter-spacing: .05em; }
-.topbar-nav a { color: #c8cdd6; text-decoration: none; margin-right: 1rem; font-size: .85rem; }
-.topbar-nav a:hover { color: #f6a623; }
-.pill { background: #232834; padding: .3rem .7rem; border-radius: 999px; font-size: .7rem; margin-left: .4rem; }
-.pill-warning { background: #3a2f10; color: #f6a623; }
-.pill-success { background: #123320; color: #22c55e; }
+.topbar-left strong { font-size: .95rem; }
+.subtitle-small { font-size: .62rem; color: var(--text-muted); letter-spacing: .06em; text-transform: uppercase; }
+.topbar-nav { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+.topbar-nav a {
+    color: var(--text-soft);
+    text-decoration: none;
+    padding: .35rem .65rem;
+    border-radius: 6px;
+    font-size: .84rem;
+    font-weight: 500;
+    transition: background .15s ease, color .15s ease;
+}
+.topbar-nav a:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.topbar-status { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.pill {
+    background: var(--neutral-soft);
+    color: var(--text-soft);
+    padding: .28rem .7rem;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+}
+.pill-warning { background: var(--warning-soft); color: var(--warning-strong); border-color: transparent; }
+.pill-success { background: var(--success-soft); color: var(--success-strong); border-color: transparent; }
 
-/* LAYOUT */
-.content { padding: 1.5rem; display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.2rem; }
+/* --------------------------------------------------------------------------
+   Layout
+   -------------------------------------------------------------------------- */
+.content { padding: 1.5rem; display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.2rem; align-items: start; }
 .content-single { padding: 1.5rem; max-width: 760px; margin: 0 auto; display: block; }
-/* La vista de cámara lleva el cuadro de EPP, que necesita ancho para que quepan
-   las columnas de EPP conforme / faltantes sin partirse en varias líneas. */
+/* La vista de camara lleva el cuadro de EPP, que necesita ancho para que quepan
+   las columnas de EPP conforme / faltantes sin partirse en varias lineas. */
 .content-single:has(.cuadro-tabla) { max-width: 1180px; }
-.camera-card, .aforo-card, .alertas-card, .deteccion-panel { background: #12151c; color: #e6e6e6; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem; }
+
+.section-title { color: var(--text); font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
+.small { font-size: .78rem; color: var(--text-muted); }
+
+/* Utilidades de texto */
+.txt-critico { color: var(--danger-strong); }
+.txt-intermedio { color: var(--warning-strong); }
+.txt-conforme { color: var(--success-strong); }
+
+.page-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.page-header .section-title { margin-bottom: 0; }
+.card-actions { margin-top: 1.25rem; display: flex; justify-content: flex-end; }
+
+/* --------------------------------------------------------------------------
+   Tarjetas
+   -------------------------------------------------------------------------- */
+.camera-card, .aforo-card, .alertas-card, .deteccion-panel {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.2rem;
+    box-shadow: var(--shadow);
+}
 .camera-card {
     padding: 0;
     overflow: hidden;
     position: relative;
     aspect-ratio: 16 / 9;
+    background: #000;
 }
-.camera-placeholder { height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #2b303b; border-radius: 10px; color: #9aa0ab; text-align: center; gap: .4rem; }
-.camera-icon { font-size: 1.8rem; }
-.small { font-size: .75rem; color: #7d8390; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .9rem; gap: .5rem; }
+.card-header h3 { font-size: .95rem; font-weight: 700; }
 
-/* CARDS */
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
-.badge { background: #232834; padding: .25rem .6rem; border-radius: 999px; font-size: .7rem; }
-.badge-success { background: #123320; color: #22c55e; }
-
-.aforo-numbers { display: flex; justify-content: space-between; margin-bottom: .8rem; }
-.aforo-numbers div { text-align: center; }
-.num { display: block; font-size: 1.6rem; font-weight: 700; }
-.num-green { color: #22c55e; }
-.aforo-numbers small { color: #7d8390; font-size: .65rem; }
-
-.progress-bar { background: #232834; border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: .4rem; }
-.progress-fill { background: #22c55e; height: 100%; }
-.progress-label { font-size: .7rem; color: #7d8390; margin-bottom: .8rem; }
-.ultimo-evento { font-size: .75rem; color: #9aa0ab; background: #1a1e27; padding: .6rem; border-radius: 8px; }
-
-.alerta { background: #1a1e27; border-left: 3px solid #f6a623; border-radius: 8px; padding: .8rem; margin-bottom: .7rem; }
-.alerta-alta { border-left-color: #ef4444; }
-.alerta-header { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: .3rem; }
-.alerta p { font-size: .8rem; color: #c8cdd6; margin-bottom: .5rem; }
-.hora { color: #7d8390; font-size: .7rem; }
-.alerta-footer { display: flex; gap: .5rem; margin-bottom: .5rem; }
-.tag { background: #232834; font-size: .65rem; padding: .2rem .5rem; border-radius: 6px; }
-.tag-media { background: #3a2f10; color: #f6a623; }
-.tag-alta { background: #3a1414; color: #ef4444; }
-.alerta button { width: 100%; padding: .5rem; border: none; border-radius: 6px; background: #f6a623; font-weight: 600; cursor: pointer; }
-.alerta button:disabled { background: #2b303b; color: #7d8390; cursor: default; }
-
-.deteccion-panel label { display: block; margin-top: .6rem; font-size: .8rem; color: #9aa0ab; }
-.deteccion-panel input { width: 100%; padding: .5rem; margin-top: .3rem; border-radius: 6px; border: 1px solid #2b303b; background: #0f1115; color: #fff; }
-.deteccion-panel button { margin-top: 1rem; padding: .6rem 1rem; background: #f6a623; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
-.resultado { margin-top: 1rem; padding: .8rem; border-radius: 8px; background: #1a1e27; font-size: .85rem; }
-.resultado-ok { color: #22c55e; }
-.resultado-fail { color: #ef4444; }
+.badge {
+    background: var(--neutral-soft);
+    color: var(--text-soft);
+    padding: .25rem .65rem;
+    border-radius: 999px;
+    font-size: .7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.badge-success { background: var(--success-soft); color: var(--success-strong); }
+.badge-media { background: var(--warning-soft); color: var(--warning-strong); }
+.badge-alta { background: var(--danger-soft); color: var(--danger-strong); }
 
 /* --------------------------------------------------------------------------
-   Cuadro de cumplimiento de EPP en vivo (vista de cámara)
-   Los tres estados son los mismos que emite el motor: CONFORME verde,
-   INTERMEDIO naranja, CRITICO rojo.
+   Camara
    -------------------------------------------------------------------------- */
-.cuadro-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; margin: .8rem 0; font-size: .72rem; color: #9aa0ab; }
-.leyenda-item { display: inline-flex; align-items: center; gap: .35rem; }
-.leyenda-dot { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
-.leyenda-dot.critico { background: #ef4444; }
-.leyenda-dot.intermedio { background: #f97316; }
-.leyenda-dot.conforme { background: #22c55e; }
-.cuadro-estado { margin-left: auto; font-size: .72rem; padding: .2rem .55rem; border-radius: 999px; background: #2b303b; color: #9aa0ab; }
-.cuadro-estado.en-linea { background: #1d3a24; color: #6ee7a0; }
-.cuadro-estado.sin-senal { background: #3a1d1d; color: #fca5a5; }
-.cuadro-estado.simulacion { background: #3d3410; color: #fde047; }
-.aviso-motor { display: none; margin: 0 0 .7rem; padding: .6rem .75rem; border-radius: .5rem;
-    border: 1px solid #713f12; background: #422006; color: #fde68a; font-size: .76rem; line-height: 1.45; }
-.aviso-motor.visible { display: block; }
-.aviso-motor code { background: #1c1408; padding: .05rem .3rem; border-radius: .2rem; color: #fcd34d; }
-
-.cuadro-tabla { width: 100%; border-collapse: collapse; margin-top: .4rem; font-size: .76rem; }
-.cuadro-tabla th { text-align: left; padding: .45rem .5rem; color: #7d8390; font-weight: 600; text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; border-bottom: 1px solid #2b303b; }
-.cuadro-tabla td { padding: .5rem; border-bottom: 1px solid #1c2028; vertical-align: top; }
-.cuadro-tabla tbody tr:hover { background: #171b23; }
-.cuadro-vacio td { text-align: center; color: #6b7280; padding: 1.2rem; font-style: italic; }
-.cuadro-conformes { color: #86efac; }
-/* "3 / 4": el numerador va en claro y el total atenuado, para que la cifra que
-   decide si hay que acercarse se lea antes que el denominador. */
-.cuadro-progreso { white-space: nowrap; color: #7d8390; }
-.cuadro-progreso strong { color: #e6e6e6; font-size: .85rem; }
-
-.chip { display: inline-block; padding: .12rem .5rem; border-radius: 999px; font-size: .65rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap; }
-.chip.conforme { background: #14532d; color: #86efac; }
-.chip.intermedio { background: #4a2508; color: #fdba74; }
-.chip.critico { background: #4c1d1d; color: #fca5a5; }
-.chip.ok { background: #1f2937; color: #6b7280; font-weight: 400; }
-
-.section-title { color: #12151c; margin-bottom: 1rem; }
-.tabla-historial { width: 100%; border-collapse: collapse; background: #12151c; color: #e6e6e6; border-radius: 10px; overflow: hidden; }
-.tabla-historial th, .tabla-historial td { padding: .6rem .8rem; text-align: left; font-size: .8rem; border-bottom: 1px solid #232834; }
-.tabla-historial th { background: #1a1e27; color: #9aa0ab; font-size: .7rem; text-transform: uppercase; }
-
-@media (max-width: 800px) {
-  .content { grid-template-columns: 1fr; }
+.camera-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    text-align: center;
+    gap: .4rem;
+    background: var(--surface-2);
+    padding: 1rem;
 }
-.camera-card {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 16 / 9;
-}
+.camera-icon { font-size: 1.8rem; }
 .camera-feed {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border-radius: 10px;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: var(--radius-sm);
     object-fit: cover;
     background: #000;
 }
 .camera-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     object-fit: cover;
     pointer-events: none;
 }
-.btn-camara {
-    margin-top: .8rem;
-    padding: .5rem 1.2rem;
-    background: #f6a623;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
+.btn-camara { margin-top: .8rem; }
+
+/* --------------------------------------------------------------------------
+   Aforo
+   -------------------------------------------------------------------------- */
+.aforo-numbers { display: flex; justify-content: space-between; margin-bottom: .9rem; }
+.aforo-numbers div { text-align: center; }
+.num { display: block; font-size: 1.7rem; font-weight: 700; line-height: 1.1; color: var(--text); }
+.num-green { color: var(--success); }
+.aforo-numbers small { color: var(--text-muted); font-size: .62rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+
+.progress-bar { background: var(--neutral-soft); border: 1px solid var(--border); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: .45rem; }
+.progress-fill { background: var(--success); height: 100%; transition: width .4s ease, background .3s ease; }
+.progress-fill.fill-media { background: var(--warning); }
+.progress-fill.fill-alta { background: var(--danger); }
+.progress-label { font-size: .72rem; color: var(--text-muted); margin-bottom: .85rem; }
+.ultimo-evento { font-size: .78rem; color: var(--text-soft); background: var(--surface-2); border: 1px solid var(--border); padding: .65rem .75rem; border-radius: var(--radius-sm); }
+
+/* --------------------------------------------------------------------------
+   Alertas
+   -------------------------------------------------------------------------- */
+.alerta {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--radius-sm);
+    padding: .85rem;
+    margin-bottom: .75rem;
+}
+.alerta-alta { border-left-color: var(--danger); }
+/* Una alerta que el motor de visión cerró solo (el trabajador se repuso el EPP):
+   se atenúa para que no compita con las que siguen abiertas. El borde verde
+   dice "ya está", sin esconderla del histórico. */
+.alerta-resuelta { border-left-color: var(--success); opacity: .72; }
+.alerta-resuelta p { text-decoration: none; }
+.alerta-header { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; margin-bottom: .3rem; }
+.alerta p { font-size: .8rem; color: var(--text-soft); margin-bottom: .55rem; }
+.hora { color: var(--text-muted); font-size: .72rem; white-space: nowrap; }
+.alerta-footer { display: flex; gap: .5rem; margin-bottom: .6rem; flex-wrap: wrap; }
+.tag { background: var(--neutral-soft); color: var(--text-soft); font-size: .65rem; font-weight: 600; padding: .2rem .55rem; border-radius: 6px; border: 1px solid var(--border); }
+.tag-media { background: var(--warning-soft); color: var(--warning-strong); border-color: transparent; }
+.tag-alta { background: var(--danger-soft); color: var(--danger-strong); border-color: transparent; }
+.tag-resuelta { background: var(--success-soft); color: var(--success-strong); border-color: transparent; }
+.tag-pendiente { background: var(--neutral-soft); color: var(--text-muted); border-color: transparent; }
+.alerta .btn { width: 100%; }
+
+/* --------------------------------------------------------------------------
+   Panel de deteccion
+   -------------------------------------------------------------------------- */
+.deteccion-panel label { display: block; margin-top: .65rem; font-size: .8rem; font-weight: 600; color: var(--text-soft); }
+.deteccion-panel input[type="text"] {
+    width: 100%;
+    padding: .55rem .7rem;
+    margin-top: .3rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: .9rem;
+}
+.deteccion-panel input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.deteccion-panel .btn { margin-top: 1rem; }
+.resultado { margin-top: 1rem; padding: .85rem; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); font-size: .85rem; }
+.resultado-ok { color: var(--success-strong); }
+.resultado-fail { color: var(--danger-strong); }
+
+/* --------------------------------------------------------------------------
+   Cuadro de cumplimiento de EPP en vivo (vista de camara)
+   Los tres estados son los mismos que emite el motor: CONFORME verde,
+   INTERMEDIO naranja, CRITICO rojo.
+   -------------------------------------------------------------------------- */
+.cuadro-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; margin: .85rem 0; font-size: .72rem; color: var(--text-muted); }
+.leyenda-item { display: inline-flex; align-items: center; gap: .35rem; }
+.leyenda-dot { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
+.leyenda-dot.critico { background: var(--danger); }
+.leyenda-dot.intermedio { background: var(--warning); }
+.leyenda-dot.conforme { background: var(--success); }
+.cuadro-estado { margin-left: auto; font-size: .72rem; font-weight: 600; padding: .2rem .55rem; border-radius: 999px; background: var(--neutral-soft); color: var(--text-muted); border: 1px solid var(--border); }
+.cuadro-estado.en-linea { background: var(--success-soft); color: var(--success-strong); border-color: transparent; }
+.cuadro-estado.sin-senal { background: var(--danger-soft); color: var(--danger-strong); border-color: transparent; }
+.cuadro-estado.simulacion { background: var(--warning-soft); color: var(--warning-strong); border-color: transparent; }
+.aviso-motor {
+    display: none;
+    margin: 0 0 .75rem;
+    padding: .65rem .8rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid #d6b56a;
+    background: var(--warning-soft);
+    color: var(--warning-strong);
+    font-size: .76rem;
+    line-height: 1.45;
+}
+.aviso-motor.visible { display: block; }
+.aviso-motor code { background: var(--accent-soft); padding: .05rem .3rem; border-radius: .2rem; color: var(--accent-strong); }
+
+.cuadro-tabla { width: 100%; border-collapse: collapse; margin-top: .4rem; font-size: .76rem; }
+.cuadro-tabla th { text-align: left; padding: .45rem .5rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: .66rem; letter-spacing: .04em; border-bottom: 1px solid var(--border); }
+.cuadro-tabla td { padding: .55rem .5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.cuadro-tabla tbody tr:hover { background: var(--surface-2); }
+.cuadro-vacio td { text-align: center; color: var(--text-muted); padding: 1.2rem; font-style: italic; }
+.cuadro-conformes { color: var(--success-strong); }
+/* "3 / 4": el numerador va en claro y el total atenuado, para que la cifra que
+   decide si hay que acercarse se lea antes que el denominador. */
+.cuadro-progreso { white-space: nowrap; color: var(--text-muted); }
+.cuadro-progreso strong { color: var(--text); font-size: .85rem; }
+
+.chip { display: inline-block; padding: .12rem .5rem; border-radius: 999px; font-size: .65rem; font-weight: 700; letter-spacing: .03em; white-space: nowrap; }
+.chip.conforme { background: var(--success-soft); color: var(--success-strong); }
+.chip.intermedio { background: var(--warning-soft); color: var(--warning-strong); }
+.chip.critico { background: var(--danger-soft); color: var(--danger-strong); }
+.chip.ok { background: var(--neutral-soft); color: var(--text-muted); font-weight: 400; }
+
+/* --------------------------------------------------------------------------
+   Historial
+   -------------------------------------------------------------------------- */
+.tabla-historial {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+.tabla-historial th, .tabla-historial td { padding: .65rem .85rem; text-align: left; font-size: .8rem; border-bottom: 1px solid var(--border); }
+.tabla-historial th { background: var(--surface-2); color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.tabla-historial tbody tr:last-child td { border-bottom: none; }
+.tabla-historial tbody tr:hover { background: var(--surface-2); }
+
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+@media (max-width: 800px) {
+    .content { grid-template-columns: 1fr; }
+    .topbar { padding: .75rem 1rem; }
+    .content, .content-single { padding: 1rem; }
 }

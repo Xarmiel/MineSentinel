@@ -2,6 +2,7 @@ package com.sentinelmine.service;
 
 import com.sentinelmine.dto.request.AnomaliaRequestDTO;
 import com.sentinelmine.dto.request.FaltaEPPRequestDTO;
+import com.sentinelmine.dto.request.InfraccionResolucionRequestDTO;
 import com.sentinelmine.entity.*;
 import com.sentinelmine.entity.enums.EstadoAlerta;
 import com.sentinelmine.entity.enums.EstadoTurno;
@@ -25,6 +26,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -51,6 +53,9 @@ class SeguridadInfraccionServiceTest {
 
     @Mock
     private EventoTurnoService eventoTurnoService;
+
+    @Mock
+    private SseNotificationService sseNotificationService;
 
     @InjectMocks
     private SeguridadInfraccionService seguridadInfraccionService;
@@ -175,6 +180,59 @@ class SeguridadInfraccionServiceTest {
         assertNotNull(actualizada);
         assertEquals(EstadoAlerta.NOTIFICADA, actualizada.getEstadoAlerta());
         verify(faltaEPPRepository, times(1)).save(falta);
+    }
+
+    // =========================================================================
+    // RESOLUCIÓN AUTOMÁTICA (el motor detecta que el trabajador se puso el EPP)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Debe marcar la falta como RESUELTA y reemitir 'alerta-actualizada' al resolver")
+    void testResolverFaltaEPPMarcaResueltaYEmiteEvento() {
+        FaltaEPP falta = new FaltaEPP(eventoActivo, rolOperador, eppCasco, 0.95f, null,
+                EstadoAlerta.PENDIENTE, LocalDateTime.now(), 7, TipoInfraccionEPP.FALTANTE, "Sin Casco");
+        falta.setFaltaId(110L);
+
+        InfraccionResolucionRequestDTO dto = new InfraccionResolucionRequestDTO(
+                110L, 7, "EPP repuesto: Casco de Seguridad", "/evidencias/cumple_7.jpg");
+
+        when(faltaEPPRepository.findById(110L)).thenReturn(Optional.of(falta));
+        when(faltaEPPRepository.save(any(FaltaEPP.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FaltaEPP resultado = seguridadInfraccionService.resolverFaltaEPP(dto);
+
+        assertEquals(EstadoAlerta.RESUELTA, resultado.getEstadoAlerta());
+        assertEquals("/evidencias/cumple_7.jpg", resultado.getSnapshotUrl());
+        verify(faltaEPPRepository, times(1)).save(falta);
+        verify(sseNotificationService, times(1)).emitirEvento(eq("alerta-actualizada"), any(FaltaEPP.class));
+    }
+
+    @Test
+    @DisplayName("Resolver una falta ya RESUELTA es idempotente: no vuelve a guardar ni emitir")
+    void testResolverFaltaEPPIdempotente() {
+        FaltaEPP falta = new FaltaEPP(eventoActivo, rolOperador, eppCasco, 0.95f, null,
+                EstadoAlerta.RESUELTA, LocalDateTime.now(), 7, TipoInfraccionEPP.FALTANTE, "Sin Casco");
+        falta.setFaltaId(111L);
+
+        when(faltaEPPRepository.findById(111L)).thenReturn(Optional.of(falta));
+
+        FaltaEPP resultado = seguridadInfraccionService.resolverFaltaEPP(
+                new InfraccionResolucionRequestDTO(111L, 7, null, null));
+
+        assertEquals(EstadoAlerta.RESUELTA, resultado.getEstadoAlerta());
+        verify(faltaEPPRepository, never()).save(any(FaltaEPP.class));
+        verify(sseNotificationService, never()).emitirEvento(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Debe lanzar error al resolver una falta inexistente")
+    void testResolverFaltaEPPInexistente() {
+        when(faltaEPPRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () ->
+                seguridadInfraccionService.resolverFaltaEPP(
+                        new InfraccionResolucionRequestDTO(999L, null, null, null)));
+        verify(faltaEPPRepository, never()).save(any(FaltaEPP.class));
     }
 
     // =========================================================================

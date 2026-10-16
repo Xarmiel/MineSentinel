@@ -24,9 +24,9 @@
     <div class="deteccion-panel">
         <h3>Cuadro de cumplimiento de EPP (YOLOv8 en vivo)</h3>
         <p class="small">Estado actual de cada trabajador rastreado. El color sale de la gravedad
-            del EPP que falta: <strong style="color:#dc2626">rojo = grave</strong>,
-            <strong style="color:#ea580c">naranja = intermedio</strong>,
-            <strong style="color:#16a34a">verde = cumple la norma</strong>. Cualquier objeto
+            del EPP que falta: <strong class="txt-critico">rojo = grave</strong>,
+            <strong class="txt-intermedio">naranja = intermedio</strong>,
+            <strong class="txt-conforme">verde = cumple la norma</strong>. Cualquier objeto
             no homologado (gorra, gafas de sol) siempre es rojo.</p>
 
         <div class="cuadro-leyenda">
@@ -64,7 +64,7 @@
         <form method="post" th:action="@{/camara/simular}">
             <label>Código de trabajador</label>
             <input type="text" name="codigoTrabajador" placeholder="16" required>
-            <button type="submit">Simular detección</button>
+            <button type="submit" class="btn btn-primary">Simular detección</button>
         </form>
 
         <div class="resultado" th:if="${resultado != null}">
@@ -78,7 +78,6 @@
         </div>
     </div>
 </main>
-</body>
 <script type="module">
 // =====================================================================
     // 1. CUADRO DE CUMPLIMIENTO (SSE) - datos del motor YOLOv8 real
@@ -434,4 +433,5 @@
     // evita depender de ese detalle.
     conectarCuadro();
 </script>
+</body>
 </html>

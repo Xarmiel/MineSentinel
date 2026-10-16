@@ -99,19 +99,27 @@ public class AlertaService {
             String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
             String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Operador";
             String codTrabajador = f.getFaltaId() != null ? String.valueOf(10 + (f.getFaltaId() % 90)) : "16";
-            boolean notificado = f.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || f.getEstadoAlerta() == EstadoAlerta.REVISADA;
+            EstadoAlerta estado = f.getEstadoAlerta();
+            boolean notificado = estado == EstadoAlerta.NOTIFICADA
+                    || estado == EstadoAlerta.REVISADA
+                    || estado == EstadoAlerta.RESUELTA;
+            String descripcionAlerta = "Sin " + eppNombre + " en el punto de control de ingreso.";
+            if (estado == EstadoAlerta.RESUELTA) {
+                descripcionAlerta = eppNombre + " repuesto. Infracción cerrada automáticamente por visión.";
+            }
 
             resultado.add(new AlertaViewDTO(
                     f.getFaltaId(),
                     "EPP",
                     "Infracción de EPP detectada (" + rolNombre + ")",
                     hora,
-                    "Sin " + eppNombre + " en el punto de control de ingreso.",
+                    descripcionAlerta,
                     codTrabajador,
                     "media",
                     false,
                     notificado,
-                    f.getSnapshotUrl()
+                    f.getSnapshotUrl(),
+                    estado != null ? estado.name() : null
             ));
         }
 
@@ -121,7 +129,8 @@ public class AlertaService {
             String hora = a.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             String anomaliaNombre = a.getCatalogoAnomalia() != null ? a.getCatalogoAnomalia().getNombre() : "Anomalía no clasificada";
             String codTrabajador = a.getAnomaliaId() != null ? String.valueOf(50 + (a.getAnomaliaId() % 50)) : "22";
-            boolean notificado = a.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || a.getEstadoAlerta() == EstadoAlerta.REVISADA;
+            EstadoAlerta estado = a.getEstadoAlerta();
+            boolean notificado = estado == EstadoAlerta.NOTIFICADA || estado == EstadoAlerta.REVISADA;
 
             resultado.add(new AlertaViewDTO(
                     a.getAnomaliaId(),
@@ -133,7 +142,8 @@ public class AlertaService {
                     "alta",
                     true,
                     notificado,
-                    a.getSnapshotUrl()
+                    a.getSnapshotUrl(),
+                    estado != null ? estado.name() : null
             ));
         }
 

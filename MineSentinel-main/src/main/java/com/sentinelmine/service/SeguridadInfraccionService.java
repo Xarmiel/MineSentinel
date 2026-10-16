@@ -2,6 +2,7 @@ package com.sentinelmine.service;
 
 import com.sentinelmine.dto.request.AnomaliaRequestDTO;
 import com.sentinelmine.dto.request.FaltaEPPRequestDTO;
+import com.sentinelmine.dto.request.InfraccionResolucionRequestDTO;
 import com.sentinelmine.entity.*;
 import com.sentinelmine.entity.enums.EstadoAlerta;
 import com.sentinelmine.entity.enums.TipoCatalogoEPP;
@@ -175,6 +176,44 @@ public class SeguridadInfraccionService {
                 .orElseThrow(() -> new IllegalArgumentException("Falta de EPP no encontrada #" + faltaId));
         falta.setEstadoAlerta(nuevoEstado);
         return faltaEPPRepository.save(falta);
+    }
+
+    /**
+     * Cierra una infracción de EPP cuando el motor de visión detecta que el
+     * trabajador volvió a portar el elemento que le faltaba.
+     *
+     * Idempotente: si la falta ya está RESUELTA o DESCARTADA se devuelve tal
+     * cual sin reemitir el evento, para que los reintentos de red del cliente
+     * no dupliquen notificaciones en el panel.
+     */
+    @Transactional
+    public FaltaEPP resolverFaltaEPP(InfraccionResolucionRequestDTO dto) {
+        FaltaEPP falta = faltaEPPRepository.findById(dto.getFaltaId())
+                .orElseThrow(() -> new IllegalArgumentException("Falta de EPP no encontrada #" + dto.getFaltaId()));
+
+        if (falta.getEstadoAlerta() == EstadoAlerta.RESUELTA
+                || falta.getEstadoAlerta() == EstadoAlerta.DESCARTADA) {
+            return falta;
+        }
+
+        falta.setEstadoAlerta(EstadoAlerta.RESUELTA);
+        if (dto.getSnapshotUrl() != null && !dto.getSnapshotUrl().isBlank()) {
+            falta.setSnapshotUrl(dto.getSnapshotUrl());
+        }
+
+        FaltaEPP guardada = faltaEPPRepository.save(falta);
+        log.info("Falta de EPP #{} marcada como RESUELTA (track {}). Motivo: {}",
+                guardada.getFaltaId(), dto.getTrackId(),
+                dto.getMotivo() != null ? dto.getMotivo() : "EPP repuesto");
+
+        try {
+            if (sseNotificationService != null) {
+                sseNotificationService.emitirEvento("alerta-actualizada", guardada);
+            }
+        } catch (Exception ignored) {
+        }
+
+        return guardada;
     }
 
     /**

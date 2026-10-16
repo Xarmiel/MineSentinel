@@ -7,5 +7,11 @@ public enum EstadoAlerta {
     PENDIENTE,
     NOTIFICADA,
     REVISADA,
-    DESCARTADA
+    DESCARTADA,
+    /**
+     * Cerrada automáticamente por el motor de visión: el trabajador volvió a
+     * portar el EPP que le faltaba. Distinta de REVISADA para no mezclar la
+     * resolución automática con la revisión humana.
+     */
+    RESUELTA
 }

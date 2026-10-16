@@ -15,7 +15,7 @@
         <span class="camera-icon">📷</span>
         <p>Activa la cámara para iniciar el monitoreo del punto de control.</p>
         <p class="small">El vídeo se procesa localmente en el navegador.</p>
-        <button type="button" id="btnActivarCamara" class="btn-camara">Activar cámara</button>
+        <button type="button" id="btnActivarCamara" class="btn btn-primary btn-camara">Activar cámara</button>
     </div>
 </section>
 
@@ -111,7 +111,10 @@
                 const elMin = document.getElementById('aforoMinimo');
                 if (elMin) elMin.textContent = data.minimo;
                 const elFill = document.getElementById('progressFill');
-                if (elFill) elFill.style.width = data.porcentaje + '%';
+                if (elFill) {
+                    elFill.style.width = data.porcentaje + '%';
+                    elFill.className = 'progress-fill' + (data.porcentaje >= 100 ? ' fill-alta' : (data.porcentaje >= 90 ? ' fill-media' : ''));
+                }
                 const elLabel = document.getElementById('progressLabel');
                 if (elLabel) elLabel.textContent = data.porcentaje + '% de capacidad';
                 const elUltimo = document.getElementById('ultimoEvento');

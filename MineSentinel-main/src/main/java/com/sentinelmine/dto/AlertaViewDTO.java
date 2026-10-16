@@ -16,6 +16,10 @@ public class AlertaViewDTO {
     private boolean prioridadAlta;
     private boolean notificadoJefeTurno;
     private String snapshotUrl;
+    // Estado crudo de la alerta (PENDIENTE, NOTIFICADA, REVISADA, DESCARTADA,
+    // RESUELTA) para que el panel admin pueda distinguir las que el motor ya
+    // cerró solo de las que siguen abiertas.
+    private String estadoAlerta;
 
     public AlertaViewDTO() {
     }
@@ -23,6 +27,14 @@ public class AlertaViewDTO {
     public AlertaViewDTO(Long id, String tipo, String tituloVisual, String horaFormateada,
                          String descripcion, String trabajadorCodigo, String prioridadTexto,
                          boolean prioridadAlta, boolean notificadoJefeTurno, String snapshotUrl) {
+        this(id, tipo, tituloVisual, horaFormateada, descripcion, trabajadorCodigo,
+                prioridadTexto, prioridadAlta, notificadoJefeTurno, snapshotUrl, null);
+    }
+
+    public AlertaViewDTO(Long id, String tipo, String tituloVisual, String horaFormateada,
+                         String descripcion, String trabajadorCodigo, String prioridadTexto,
+                         boolean prioridadAlta, boolean notificadoJefeTurno, String snapshotUrl,
+                         String estadoAlerta) {
         this.id = id;
         this.tipo = tipo;
         this.tituloVisual = tituloVisual;
@@ -33,6 +45,7 @@ public class AlertaViewDTO {
         this.prioridadAlta = prioridadAlta;
         this.notificadoJefeTurno = notificadoJefeTurno;
         this.snapshotUrl = snapshotUrl;
+        this.estadoAlerta = estadoAlerta;
     }
 
     public Long getId() {
@@ -113,5 +126,13 @@ public class AlertaViewDTO {
 
     public void setSnapshotUrl(String snapshotUrl) {
         this.snapshotUrl = snapshotUrl;
+    }
+
+    public String getEstadoAlerta() {
+        return estadoAlerta;
+    }
+
+    public void setEstadoAlerta(String estadoAlerta) {
+        this.estadoAlerta = estadoAlerta;
     }
 }

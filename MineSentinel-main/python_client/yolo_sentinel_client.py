@@ -195,12 +195,17 @@ class MineSentinelClient:
 
     def enviar_infraccion(self, epp_id: Optional[int], rol_id: int, confianza: float,
                           snapshot_url: str, tipo_infraccion: str = "FALTANTE",
-                          descripcion: str = "", track_id: Optional[int] = None) -> bool:
-        """Registra una infracción de EPP (FALTANTE o IMPOSTOR) detectada por YOLOv8."""
+                          descripcion: str = "", track_id: Optional[int] = None) -> Optional[int]:
+        """Registra una infracción de EPP (FALTANTE o IMPOSTOR) detectada por YOLOv8.
+
+        Devuelve el `faltaId` con el que el backend la archivó, o None si no se
+        pudo registrar. Ese id es lo que permite cerrarla después con
+        `resolver_infraccion` cuando el trabajador vuelve a portar el EPP.
+        """
         if epp_id is None:
             logger.warning("Infracción de tipo %s descartada: el elemento '%s' no existe en "
                            "el catálogo del backend", tipo_infraccion, descripcion)
-            return False
+            return None
 
         payload = {
             "eppId": epp_id,
@@ -220,10 +225,38 @@ class MineSentinelClient:
                 icono = "IMPOSTOR" if tipo_infraccion == "IMPOSTOR" else "FALTANTE"
                 logger.warning("[%s] %s -> Falta #%s (Confianza: %.1f%%, Track #%s)",
                                icono, descripcion, f.get("faltaId"), confianza * 100, track_id)
-                return True
+                return f.get("faltaId")
             logger.warning("Error al registrar infracción: %s - %s", res.status_code, res.text)
         except Exception as e:
             logger.error("Fallo en envío de infracción: %s", e)
+        return None
+
+    def resolver_infraccion(self, falta_id: int, track_id: Optional[int] = None,
+                            motivo: str = "EPP repuesto", snapshot_url: str = "") -> bool:
+        """Cierra una infracción abierta: el trabajador volvió a portar el EPP.
+
+        El backend la pasa a RESUELTA y el panel admin la recibe por SSE, de modo
+        que la alerta se marca cerrada sola, sin intervención humana.
+        """
+        if not falta_id:
+            return False
+
+        payload = {"faltaId": falta_id, "motivo": motivo}
+        if track_id is not None:
+            payload["trackId"] = track_id
+        if snapshot_url:
+            payload["snapshotUrl"] = snapshot_url
+
+        try:
+            res = self.session.post(f"{self.base_url}/api/v1/seguridad/infracciones/resolucion",
+                                    json=payload, timeout=5)
+            if res.status_code in (200, 201, 202, 204):
+                logger.info("Falta #%s resuelta (Track #%s): %s", falta_id, track_id, motivo)
+                return True
+            logger.warning("Error al resolver infracción #%s: %s - %s",
+                           falta_id, res.status_code, res.text)
+        except Exception as e:
+            logger.error("Fallo en resolución de infracción: %s", e)
         return False
 
     def enviar_cuadro(self, cuadro: dict) -> bool:
@@ -374,6 +407,19 @@ class PipelineEPP:
         self.lado_por_track: Dict[int, str] = {}
         self.total_movimientos = 0
         self.total_infracciones = 0
+        self.total_resueltas = 0
+
+        # --- Tracker de episodios de EPP (ciclo de vida de la alerta) ---
+        # Cada infracción de EPP es un "episodio" que se ABRÍ (crea la alerta en
+        # el panel) cuando el trabajador pasa a incumplir y se CIERRA (la marca
+        # RESUELTA) cuando vuelve a portar el EPP. Se gobierna por las
+        # transiciones del `estado_actual`, no por el enfriamiento, para que el
+        # panel de admin refleje al instante quién se quitó y quién se repuso.
+        self._abiertas: Dict[tuple, int] = {}      # (track, clave, tipo) -> faltaId
+        self._cuenta_abrir: Dict[tuple, int] = {}  # frames consecutivos con falta
+        self._cuenta_cerrar: Dict[tuple, int] = {}  # frames consecutivos sin falta
+        self.frames_abrir = max(1, int(getattr(detector, "frames_abrir", 3)))
+        self.frames_cerrar = max(1, int(getattr(detector, "frames_cerrar", 8)))
 
     # -------------------------------------------------------------------------
 
@@ -398,7 +444,16 @@ class PipelineEPP:
             if track_id not in {p.track_id for p in analisis.personas}:
                 del self.lado_por_track[track_id]
 
-    def _reportar_infracciones(self, analisis) -> None:
+    def _reportar_infracciones(self, analisis, incluir_epp: bool = True) -> None:
+        """Reporta las infracciones NUEVAS de este frame (ya con enfriamiento).
+
+        En los bucles en vivo `incluir_epp=False`: ahí el EPP se reporta por el
+        tracker de episodios (`_sincronizar_episodios`), que gobierna el ciclo
+        de vida completo (apertura y cierre). Así no se duplica la alerta. Sólo
+        las anomalías de movimiento siguen pasando por aquí (camino por
+        enfriamiento, sin resolución automática). La imagen única usa el camino
+        completo porque es un análisis de un solo frame sin ciclo de vida.
+        """
         if not analisis.infracciones:
             return
 
@@ -409,23 +464,119 @@ class PipelineEPP:
             )
 
         for infraccion in analisis.infracciones:
-            self.total_infracciones += 1
-            if self.dry_run:
-                logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
-                            infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
-                continue
-
             if infraccion.es_anomalia:
+                self.total_infracciones += 1
+                if self.dry_run:
+                    logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
+                                infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
+                    continue
                 self.cliente.enviar_anomalia(
                     self.cliente.catalogo.anomalia_id(infraccion.nombre_catalogo),
                     self.rol_id, infraccion.confianza, snapshot_url,
                 )
-            else:
+            elif incluir_epp:
+                self.total_infracciones += 1
+                if self.dry_run:
+                    logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
+                                infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
+                    continue
                 self.cliente.enviar_infraccion(
                     self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
                     self.rol_id, infraccion.confianza, snapshot_url,
                     infraccion.tipo, infraccion.descripcion, infraccion.track_id,
                 )
+
+    # -------------------------------------------------------------------------
+    # CICLO DE VIDA DE LA INFRACCIÓN (apertura y cierre de episodio)
+    # -------------------------------------------------------------------------
+
+    def _sincronizar_episodios(self, analisis) -> None:
+        """Abre y cierra episodios de infracción de EPP según las transiciones.
+
+        Un "episodio" es la falta continua de un mismo (track, elemento, tipo).
+        Se ABRE cuando el trabajador pasa a incumplir de forma sostenida (N
+        frames) y se CIERRA cuando vuelve a portar el EPP (otros N frames sin
+        falta). Gobierna el ciclo de vida de la alerta en el panel de admin:
+        la crea al quitarse el EPP y la marca RESUELTA al ponérselo.
+
+        A propósito NO cierra cuando el track desaparece de cámara: si el
+        trabajador salió del encuadre aún sin EPP, no podemos afirmar que se
+        repuso, así que la alerta queda abierta para revisión humana.
+        """
+        TRACK_SIN_ASIGNAR = -1
+
+        # Claves que este frame marcan como INCUMPLIMIENTO vigente (sólo EPP
+        # real: FALTANTE/IMPOSTOR con track asignado; las anomalías de
+        # movimiento siguen su propio camino por enfriamiento).
+        incumpliendo = {}
+        for i in analisis.estado_actual:
+            if i.es_anomalia or i.track_id is None or i.track_id == TRACK_SIN_ASIGNAR:
+                continue
+            incumpliendo[(i.track_id, i.clave, i.tipo)] = i
+
+        # --- Cierre: claves abiertas que dejaron de incumplir -----------------
+        for key, falta_id in list(self._abiertas.items()):
+            track_id = key[0]
+            if key in incumpliendo:
+                # Sigue sin EPP: se reinicia el contador de cierre.
+                self._cuenta_cerrar.pop(key, None)
+                continue
+            if track_id not in {p.track_id for p in analisis.personas}:
+                # El trabajador salió de cámara: no se cierra solo.
+                self._cuenta_cerrar.pop(key, None)
+                continue
+
+            cierre = self._cuenta_cerrar.get(key, 0) + 1
+            if cierre >= self.frames_cerrar:
+                self.total_resueltas += 1
+                if self.dry_run:
+                    logger.info("[DRY-RUN] RESUELTA track #%s | falta #%s", track_id, falta_id)
+                else:
+                    self.cliente.resolver_infraccion(
+                        falta_id, track_id=track_id, motivo="EPP repuesto por el trabajador")
+                self._abiertas.pop(key, None)
+                self._cuenta_cerrar.pop(key, None)
+            else:
+                self._cuenta_cerrar[key] = cierre
+
+        # --- Apertura: claves incumpliendo que aún no tienen episodio ---------
+        for key, infraccion in incumpliendo.items():
+            if key in self._abiertas:
+                continue  # ya hay un episodio abierto para esta falta
+            cuenta = self._cuenta_abrir.get(key, 0) + 1
+            if cuenta < self.frames_abrir:
+                self._cuenta_abrir[key] = cuenta
+                continue
+
+            self._cuenta_abrir.pop(key, None)
+            self.total_infracciones += 1
+            if self.dry_run:
+                logger.info("[DRY-RUN] APERTURA track #%s | %s | %s",
+                            key[0], infraccion.tipo, infraccion.descripcion)
+                continue
+
+            snapshot_url = ""
+            if analisis.imagen_anotada is not None:
+                snapshot_url = self.cliente.subir_evidencia(
+                    analisis.imagen_anotada, f"epp_abrir_{analisis.fotograma}.jpg")
+
+            falta_id = self.cliente.enviar_infraccion(
+                self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
+                self.rol_id, infraccion.confianza, snapshot_url,
+                infraccion.tipo, infraccion.descripcion, infraccion.track_id,
+            )
+            if falta_id:
+                self._abiertas[key] = falta_id
+
+        # Limpieza de contadores de claves que ya no aplican (ni abiertas ni
+        # incumpliendo): evita que un contador viejo dispare una apertura
+        # espuria si la misma combinación reaparece más tarde.
+        for key in list(self._cuenta_abrir):
+            if key not in incumpliendo and key not in self._abiertas:
+                self._cuenta_abrir.pop(key, None)
+        for key in list(self._cuenta_cerrar):
+            if key in incumpliendo or key not in self._abiertas:
+                self._cuenta_cerrar.pop(key, None)
 
     # -------------------------------------------------------------------------
 
@@ -494,13 +645,14 @@ class PipelineEPP:
                 analisis = self.detector.analizar(frame, rol_id=self.rol_id, linea=self.linea)
                 processed += 1
                 self._cruces_de_linea(analisis, frame.shape[0])
-                self._reportar_infracciones(analisis)
+                self._reportar_infracciones(analisis, incluir_epp=False)
+                self._sincronizar_episodios(analisis)
                 self._publicar_cuadro(analisis)
 
                 if processed % 30 == 0:
-                    logger.info("Frame %s | %d personas | %d movimientos | %d infracciones | %.1f fps",
+                    logger.info("Frame %s | %d personas | %d movimientos | %d infracciones | %d resueltas | %.1f fps",
                                 analisis.fotograma, len(analisis.personas), self.total_movimientos,
-                                self.total_infracciones, analisis.fps)
+                                self.total_infracciones, self.total_resueltas, analisis.fps)
                 if self.mostrar:
                     cv2.imshow("MineSentinel - Deteccion de EPP", analisis.imagen_anotada)
                     if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -511,8 +663,8 @@ class PipelineEPP:
             if self.mostrar:
                 cv2.destroyAllWindows()
 
-        logger.info("Procesados %d frames | %d movimientos de aforo | %d infracciones reportadas",
-                    processed, self.total_movimientos, self.total_infracciones)
+        logger.info("Procesados %d frames | %d movimientos de aforo | %d infracciones abiertas | %d resueltas",
+                    processed, self.total_movimientos, self.total_infracciones, self.total_resueltas)
 
     def _abrir_camara(self, cv2, indice: int):
         """Abre la cámara probando backends, porque el que usa OpenCV por

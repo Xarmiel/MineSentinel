@@ -238,6 +238,19 @@ emision:
   # tiene en las gafas (~0.30).
   confianza_minima_alerta: 0.30
 
+  # --- Ciclo de vida de la infracción (apertura y cierre de episodio) ---
+  # El tracker de episodios del pipeline decide cuándo ABRIR (crear la alerta en
+  # el panel) y cuándo CERRAR (marcarla RESUELTA) según las transiciones del
+  # estado real del trabajador, no según el enfriamiento. Esto hace que el panel
+  # de admin refleje al instante quién se quitó y quién se volvió a poner el EPP.
+  #
+  # Frames consecutivos con falta antes de ABRIR el episodio. Filtra el
+  # parpadeo de un solo frame (asociación EPP↔persona inestable).
+  frames_abrir: 3
+  # Frames consecutivos sin falta antes de CERRAR (resolver) el episodio. Mayor
+  # que frames_abrir a propósito: cerrar y reabrir cada frame generaría ruido.
+  frames_cerrar: 8
+
 # =============================================================================
 # CUADRO DE CUMPLIMIENTO (vista en vivo por persona)
 # =============================================================================
