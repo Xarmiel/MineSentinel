@@ -1,4 +1,4 @@
-package com.sentinelmine.model;
+package com.sentinelmine.entity.enums;
 
 public enum Prioridad {
     BAJA,

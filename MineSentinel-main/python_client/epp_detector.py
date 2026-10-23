@@ -230,6 +230,7 @@ class DetectorEPP:
         self.confianza_minima_alerta = float(emision.get("confianza_minima_alerta", 0.45))
         # Tracker de episodios del pipeline: cuántos frames consecutivos con
         # falta antes de abrir una alerta, y cuántos sin falta antes de cerrarla.
+        self.segundos_evaluacion = float(emision.get("segundos_evaluacion", 5.0))
         self.frames_abrir = max(1, int(emision.get("frames_abrir", 3)))
         self.frames_cerrar = max(1, int(emision.get("frames_cerrar", 8)))
 

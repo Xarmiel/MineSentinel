@@ -2,14 +2,8 @@ package com.sentinelmine.service;
 
 import com.sentinelmine.dto.AlertaViewDTO;
 import com.sentinelmine.entity.AnomaliaMovimiento;
-import com.sentinelmine.entity.CatalogoEPP;
-import com.sentinelmine.entity.EventoTurno;
 import com.sentinelmine.entity.FaltaEPP;
-import com.sentinelmine.entity.RolPersonal;
 import com.sentinelmine.entity.enums.EstadoAlerta;
-import com.sentinelmine.entity.enums.EstadoTurno;
-import com.sentinelmine.model.Prioridad;
-import com.sentinelmine.model.TipoAlerta;
 import com.sentinelmine.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +11,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,7 +18,7 @@ import java.util.List;
 
 /**
  * Servicio de alertas conectado a las tablas normalizadas `faltas_epp` y `anomalias_movimiento`.
- * Resuelve colisiones de claves primarias mediante identificación tipada de alertas.
+ * Proporciona el historial y canaliza notificaciones sin fabricar identidades ni catálogos simulados.
  */
 @Service
 public class AlertaService {
@@ -34,50 +27,17 @@ public class AlertaService {
 
     private final FaltaEPPRepository faltaEPPRepository;
     private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
-    private final CatalogoEPPRepository catalogoEPPRepository;
-    private final EventoTurnoRepository eventoTurnoRepository;
-    private final RolPersonalRepository rolPersonalRepository;
     private final NotificacionExternaService notificacionExternaService;
     private final SseNotificationService sseNotificationService;
 
     public AlertaService(FaltaEPPRepository faltaEPPRepository,
                          AnomaliaMovimientoRepository anomaliaMovimientoRepository,
-                         CatalogoEPPRepository catalogoEPPRepository,
-                         EventoTurnoRepository eventoTurnoRepository,
-                         RolPersonalRepository rolPersonalRepository,
                          NotificacionExternaService notificacionExternaService,
                          SseNotificationService sseNotificationService) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
-        this.catalogoEPPRepository = catalogoEPPRepository;
-        this.eventoTurnoRepository = eventoTurnoRepository;
-        this.rolPersonalRepository = rolPersonalRepository;
         this.notificacionExternaService = notificacionExternaService;
         this.sseNotificationService = sseNotificationService;
-    }
-
-    @Transactional
-    public void registrarAlerta(TipoAlerta tipo, String trabajadorCodigo, String descripcion, Prioridad prioridad) {
-        EventoTurno evento = obtenerOcrearEventoActivo();
-        RolPersonal rol = rolPersonalRepository.findAll().stream().findFirst().orElse(null);
-
-        if (tipo == TipoAlerta.EPP_INCOMPLETO) {
-            CatalogoEPP epp = catalogoEPPRepository.findAll().stream().findFirst()
-                    .orElseGet(() -> catalogoEPPRepository.save(new CatalogoEPP("Casco de Seguridad con Barbiquejo")));
-
-            FaltaEPP falta = new FaltaEPP(
-                    evento,
-                    rol,
-                    epp,
-                    0.92f,
-                    null,
-                    EstadoAlerta.PENDIENTE,
-                    LocalDateTime.now()
-            );
-            FaltaEPP guardada = faltaEPPRepository.save(falta);
-            log.info("Falta de EPP registrada para trabajador #{}: {}", trabajadorCodigo, descripcion);
-            sseNotificationService.emitirEvento("alerta-nueva", guardada);
-        }
     }
 
     @Transactional(readOnly = true)
@@ -87,8 +47,8 @@ public class AlertaService {
         for (FaltaEPP f : faltas) {
             String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
-            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Operador";
-            String codTrabajador = f.getFaltaId() != null ? String.valueOf(10 + (f.getFaltaId() % 90)) : "16";
+            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Personal";
+            String codTrabajador = f.getRol() != null ? rolNombre : "N/I";
             boolean notificado = f.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || f.getEstadoAlerta() == EstadoAlerta.REVISADA;
 
             resultado.add(new AlertaViewDTO(
@@ -116,8 +76,8 @@ public class AlertaService {
         for (FaltaEPP f : faltas) {
             String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
-            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Operador";
-            String codTrabajador = f.getFaltaId() != null ? String.valueOf(10 + (f.getFaltaId() % 90)) : "16";
+            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Personal";
+            String codTrabajador = f.getRol() != null ? rolNombre : "N/I";
             EstadoAlerta estado = f.getEstadoAlerta();
             boolean notificado = estado == EstadoAlerta.NOTIFICADA
                     || estado == EstadoAlerta.REVISADA
@@ -147,7 +107,7 @@ public class AlertaService {
         for (AnomaliaMovimiento a : anomalias) {
             String hora = a.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
             String anomaliaNombre = a.getCatalogoAnomalia() != null ? a.getCatalogoAnomalia().getNombre() : "Anomalía no clasificada";
-            String codTrabajador = a.getAnomaliaId() != null ? String.valueOf(50 + (a.getAnomaliaId() % 50)) : "22";
+            String codTrabajador = "Punto Control";
             EstadoAlerta estado = a.getEstadoAlerta();
             boolean notificado = estado == EstadoAlerta.NOTIFICADA || estado == EstadoAlerta.REVISADA;
 
@@ -166,7 +126,7 @@ public class AlertaService {
             ));
         }
 
-        // Ordenar descendentemente por hora/id
+        // Ordenar descendentemente por id
         resultado.sort(Comparator.comparing(AlertaViewDTO::getId, Comparator.nullsLast(Comparator.reverseOrder())));
         return resultado;
     }
@@ -183,7 +143,7 @@ public class AlertaService {
                 anomaliaMovimientoRepository.save(anomalia);
                 log.info("Anomalía #{} marcada como NOTIFICADA.", idAlerta);
                 String desc = anomalia.getCatalogoAnomalia() != null ? anomalia.getCatalogoAnomalia().getNombre() : "Anomalía postural";
-                notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", desc, "Auto", anomalia.getSnapshotUrl());
+                notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", desc, "N/I", anomalia.getSnapshotUrl());
                 sseNotificationService.emitirEvento("alerta-actualizada", anomalia);
             });
         } else {
@@ -193,7 +153,8 @@ public class AlertaService {
                 faltaEPPRepository.save(falta);
                 log.info("Falta de EPP #{} marcada como NOTIFICADA.", idAlerta);
                 String desc = falta.getEpp() != null ? "Falta de " + falta.getEpp().getNombre() : "Falta de EPP";
-                notificacionExternaService.despacharNotificacionJefeTurno("Infracción de EPP", desc, "Auto", falta.getSnapshotUrl());
+                String rol = falta.getRol() != null ? falta.getRol().getNombre() : "Personal";
+                notificacionExternaService.despacharNotificacionJefeTurno("Infracción de EPP", desc, rol, falta.getSnapshotUrl());
                 sseNotificationService.emitirEvento("alerta-actualizada", falta);
             }, () -> {
                 // Fallback de búsqueda cruzada si el tipo no coincidiera
@@ -201,24 +162,10 @@ public class AlertaService {
                     anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                     anomaliaMovimientoRepository.save(anomalia);
                     log.info("Anomalía #{} marcada como NOTIFICADA (fallback).", idAlerta);
-                    notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", "Riesgo detectado", "Auto", anomalia.getSnapshotUrl());
+                    notificacionExternaService.despacharNotificacionJefeTurno("Anomalía de Movimiento", "Riesgo detectado", "N/I", anomalia.getSnapshotUrl());
                     sseNotificationService.emitirEvento("alerta-actualizada", anomalia);
                 });
             });
         }
-    }
-
-    private EventoTurno obtenerOcrearEventoActivo() {
-        List<EventoTurno> activos = eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
-        if (!activos.isEmpty()) {
-            return activos.get(0);
-        }
-        return eventoTurnoRepository.findAll().stream().findFirst()
-                .orElseGet(() -> {
-                    EventoTurno nuevo = new EventoTurno();
-                    nuevo.setEstado(EstadoTurno.ACTIVO);
-                    nuevo.setFechaInicio(LocalDateTime.now());
-                    return eventoTurnoRepository.save(nuevo);
-                });
     }
 }

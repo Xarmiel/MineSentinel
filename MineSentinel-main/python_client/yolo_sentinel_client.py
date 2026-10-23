@@ -418,6 +418,9 @@ class PipelineEPP:
         self._abiertas: Dict[tuple, int] = {}      # (track, clave, tipo) -> faltaId
         self._cuenta_abrir: Dict[tuple, int] = {}  # frames consecutivos con falta
         self._cuenta_cerrar: Dict[tuple, int] = {}  # frames consecutivos sin falta
+        self._primer_avistamiento: Dict[int, float] = {}  # track_id -> timestamp primer frame
+        self._historial_confianzas: Dict[tuple, List[float]] = {}  # (track, clave, tipo) -> [confianzas]
+        self.segundos_evaluacion = float(getattr(detector, 'segundos_evaluacion', 0.0))
         self.frames_abrir = max(1, int(getattr(detector, "frames_abrir", 3)))
         self.frames_cerrar = max(1, int(getattr(detector, "frames_cerrar", 8)))
 
@@ -539,10 +542,30 @@ class PipelineEPP:
             else:
                 self._cuenta_cerrar[key] = cierre
 
+        # --- Registro de tiempo y agregación de confianzas por track ---------
+        ahora = time.time()
+        personas_visibles = {p.track_id for p in analisis.personas}
+        for tid in personas_visibles:
+            if tid not in self._primer_avistamiento:
+                self._primer_avistamiento[tid] = ahora
+
+        # Acumular confianzas por frame para el promedio
+        for key, infraccion in incumpliendo.items():
+            self._historial_confianzas.setdefault(key, []).append(float(infraccion.confianza))
+
         # --- Apertura: claves incumpliendo que aún no tienen episodio ---------
         for key, infraccion in incumpliendo.items():
             if key in self._abiertas:
                 continue  # ya hay un episodio abierto para esta falta
+
+            track_id = key[0]
+            tiempo_visible = ahora - self._primer_avistamiento.get(track_id, ahora)
+            # Estrategia Híbrida: si aún no alcanza los segundos_evaluacion (5s), se espera
+            # a acumular historial estable, a menos que el frame supere el umbral frames_abrir
+            # y ya haya transcurrido el tiempo mínimo.
+            if tiempo_visible < self.segundos_evaluacion:
+                continue
+
             cuenta = self._cuenta_abrir.get(key, 0) + 1
             if cuenta < self.frames_abrir:
                 self._cuenta_abrir[key] = cuenta
@@ -550,9 +573,14 @@ class PipelineEPP:
 
             self._cuenta_abrir.pop(key, None)
             self.total_infracciones += 1
+
+            # Calcular el promedio de confianza real registrado durante la ventana
+            confianzas = self._historial_confianzas.get(key, [infraccion.confianza])
+            confianza_promedio = round(sum(confianzas) / max(1, len(confianzas)), 3)
+
             if self.dry_run:
-                logger.info("[DRY-RUN] APERTURA track #%s | %s | %s",
-                            key[0], infraccion.tipo, infraccion.descripcion)
+                logger.info("[DRY-RUN] APERTURA track #%s | %s | %s (conf_promedio=%.2f tras %.1fs)",
+                            key[0], infraccion.tipo, infraccion.descripcion, confianza_promedio, tiempo_visible)
                 continue
 
             snapshot_url = ""
@@ -562,7 +590,7 @@ class PipelineEPP:
 
             falta_id = self.cliente.enviar_infraccion(
                 self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
-                self.rol_id, infraccion.confianza, snapshot_url,
+                self.rol_id, confianza_promedio, snapshot_url,
                 infraccion.tipo, infraccion.descripcion, infraccion.track_id,
             )
             if falta_id:
@@ -574,9 +602,15 @@ class PipelineEPP:
         for key in list(self._cuenta_abrir):
             if key not in incumpliendo and key not in self._abiertas:
                 self._cuenta_abrir.pop(key, None)
+                self._historial_confianzas.pop(key, None)
         for key in list(self._cuenta_cerrar):
             if key in incumpliendo or key not in self._abiertas:
                 self._cuenta_cerrar.pop(key, None)
+
+        # Limpieza de tracks que ya salieron del rango de visión
+        for tid in list(self._primer_avistamiento):
+            if tid not in personas_visibles:
+                self._primer_avistamiento.pop(tid, None)
 
     # -------------------------------------------------------------------------
 
