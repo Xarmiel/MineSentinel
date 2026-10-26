@@ -13,3 +13,6 @@ args.yaml
 target/
 **/target/
 
+
+*.mp4
+uploads/
