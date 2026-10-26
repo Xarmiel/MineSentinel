@@ -368,6 +368,36 @@ body {
 /* --------------------------------------------------------------------------
    Historial
    -------------------------------------------------------------------------- */
+.content-single:has(.tabla-historial) { max-width: 1280px; }
+
+.filtros-historial {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .7rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.1rem;
+    box-shadow: var(--shadow);
+}
+.filtro-campo { display: flex; flex-direction: column; gap: .25rem; min-width: 130px; }
+.filtro-campo-ancho { flex: 1 1 200px; }
+.filtro-campo label { font-size: .7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.filtro-campo input, .filtro-campo select {
+    width: 100%;
+    padding: .45rem .55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: .8rem;
+}
+.filtro-campo input:focus, .filtro-campo select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.filtro-acciones { display: flex; gap: .5rem; }
+
 .tabla-historial {
     width: 100%;
     border-collapse: collapse;
@@ -378,10 +408,24 @@ body {
     overflow: hidden;
     box-shadow: var(--shadow);
 }
-.tabla-historial th, .tabla-historial td { padding: .65rem .85rem; text-align: left; font-size: .8rem; border-bottom: 1px solid var(--border); }
+.tabla-historial th, .tabla-historial td { padding: .65rem .85rem; text-align: left; font-size: .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
 .tabla-historial th { background: var(--surface-2); color: var(--text-muted); font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .tabla-historial tbody tr:last-child td { border-bottom: none; }
 .tabla-historial tbody tr:hover { background: var(--surface-2); }
+.tabla-historial .fila-resuelta { opacity: .72; }
+.tabla-vacia { text-align: center !important; color: var(--text-muted); padding: 1.5rem !important; font-style: italic; }
+.historial-thumb {
+    width: 54px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-strong);
+    display: block;
+}
+
+.paginacion { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+.paginacion-controles { display: flex; gap: .5rem; }
+.btn.deshabilitado { pointer-events: none; opacity: .45; }
 
 /* --------------------------------------------------------------------------
    Responsive

@@ -29,9 +29,48 @@ class ReporteExportServiceTest {
         assertTrue(csvBytes.length > 0);
 
         String contenido = new String(csvBytes, StandardCharsets.UTF_8);
-        assertTrue(contenido.contains("ID;Tipo;Titulo;Hora;Descripcion;Trabajador;Prioridad;Notificado_Jefe_Turno;Snapshot_URL"));
+        assertTrue(contenido.contains("ID;Tipo;Titulo;Fecha_Hora;Hora;Descripcion;Trabajador;Track;Rol;Prioridad;Estado;Notificado_Jefe_Turno;Confianza;Turno;Snapshot_URL"));
         assertTrue(contenido.contains("Falta Casco"));
-        assertTrue(contenido.contains("#16"));
+        assertTrue(contenido.contains(";16;"));
+    }
+
+    @Test
+    @DisplayName("El CSV debe incluir fecha, estado, track, confianza y turno")
+    void testGenerarCsvHistorialConTrazabilidad() {
+        AlertaViewDTO alerta = new AlertaViewDTO(
+                7L, "EPP", "Falta de EPP detectada", "14:30:00",
+                "Sin casco en boca-mina", "16", "media", false, true,
+                "/api/v1/evidencias/snap1.jpg", "RESUELTA");
+        alerta.setFechaHora(LocalDateTime.of(2026, 10, 26, 14, 30, 0));
+        alerta.setTrackId(16);
+        alerta.setRolNombre("Operador de Maquinaria");
+        alerta.setNivelConfianza(0.87f);
+        alerta.setTurnoNombre("Guardia Día");
+
+        String contenido = new String(
+                reporteService.generarCsvHistorialAlertas(List.of(alerta)),
+                StandardCharsets.UTF_8);
+
+        assertTrue(contenido.contains("2026-10-26 14:30:00"));
+        assertTrue(contenido.contains(";RESUELTA;"));
+        assertTrue(contenido.contains(";0,87;") || contenido.contains(";0.87;"));
+        assertTrue(contenido.contains("Guardia Día"));
+        assertTrue(contenido.contains("Operador de Maquinaria"));
+    }
+
+    @Test
+    @DisplayName("El CSV debe neutralizar textos que Excel interpretaría como fórmula")
+    void testGenerarCsvEscapaFormulas() {
+        AlertaViewDTO alerta = new AlertaViewDTO(
+                8L, "EPP", "=HYPERLINK(\"http://x\")", "14:31:00",
+                "+SUM(1,2)", "16", "media", false, false, null, "PENDIENTE");
+
+        String contenido = new String(
+                reporteService.generarCsvHistorialAlertas(List.of(alerta)),
+                StandardCharsets.UTF_8);
+
+        assertTrue(contenido.contains("'=HYPERLINK"));
+        assertTrue(contenido.contains("'+SUM"));
     }
 
     @Test

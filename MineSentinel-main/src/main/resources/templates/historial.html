@@ -10,129 +10,139 @@
 
 <main class="content-single">
     <div class="page-header">
-        <h2 class="section-title">Historial de Alertas</h2>
-        <a th:href="@{/historial/exportar/csv}" class="btn btn-secondary">
-            Exportar Historial a CSV (Excel)
+        <div>
+            <h2 class="section-title">Historial de Alertas</h2>
+            <p class="small" th:if="${pagina.totalElements > 0}">
+                Mostrando <span th:text="${pagina.startItem}">1</span>–<span th:text="${pagina.endItem}">25</span>
+                de <span th:text="${pagina.totalElements}">0</span> registros
+            </p>
+            <p class="small" th:if="${pagina.totalElements == 0}">Sin registros para los filtros seleccionados.</p>
+        </div>
+        <a th:href="@{/historial/exportar/csv(desde=${filtro.desde},hasta=${filtro.hasta},tipo=${filtro.tipo},estado=${filtro.estado},trackId=${filtro.trackId},q=${filtro.q})}"
+           class="btn btn-secondary">
+            Exportar filtrado a CSV
         </a>
     </div>
 
-    <!-- Barra de Filtros -->
-    <div style="background: #12151c; padding: 1rem; border-radius: 10px; margin-bottom: 1.2rem; display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: flex-end;">
-        <div style="flex: 1; min-width: 120px;">
-            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Hora</label>
-            <input type="text" id="filtroHora" placeholder="Ej: 14:30" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
+    <form method="get" th:action="@{/historial}" class="filtros-historial">
+        <div class="filtro-campo">
+            <label for="filtroDesde">Desde</label>
+            <input type="date" id="filtroDesde" name="desde" th:value="${filtro.desde}">
         </div>
-        <div style="flex: 1; min-width: 130px;">
-            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Tipo</label>
-            <select id="filtroTipo" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
-                <option value="">Todos</option>
-                <option value="EPP">EPP / Infracción</option>
-                <option value="ANOMALIA">Anomalía / Postura</option>
+        <div class="filtro-campo">
+            <label for="filtroHasta">Hasta</label>
+            <input type="date" id="filtroHasta" name="hasta" th:value="${filtro.hasta}">
+        </div>
+        <div class="filtro-campo">
+            <label for="filtroTipo">Tipo</label>
+            <select id="filtroTipo" name="tipo">
+                <option value="" th:selected="${filtro.tipo == null}">Todos</option>
+                <option value="EPP" th:selected="${filtro.tipo == 'EPP'}">EPP / Infracción</option>
+                <option value="ANOMALIA" th:selected="${filtro.tipo == 'ANOMALIA'}">Anomalía / Postura</option>
             </select>
         </div>
-        <div style="flex: 1; min-width: 120px;">
-            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Trabajador</label>
-            <input type="text" id="filtroTrabajador" placeholder="Ej: 16" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
-        </div>
-        <div style="flex: 1; min-width: 120px;">
-            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Prioridad</label>
-            <select id="filtroPrioridad" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
-                <option value="">Todas</option>
-                <option value="Alta">Alta</option>
-                <option value="Media">Media</option>
-                <option value="Baja">Baja</option>
+        <div class="filtro-campo">
+            <label for="filtroEstado">Estado</label>
+            <select id="filtroEstado" name="estado">
+                <option value="" th:selected="${filtro.estado == null}">Todos</option>
+                <option value="PENDIENTE" th:selected="${filtro.estado == 'PENDIENTE'}">Pendiente</option>
+                <option value="NOTIFICADA" th:selected="${filtro.estado == 'NOTIFICADA'}">Notificada</option>
+                <option value="REVISADA" th:selected="${filtro.estado == 'REVISADA'}">Revisada</option>
+                <option value="RESUELTA" th:selected="${filtro.estado == 'RESUELTA'}">Resuelta por visión</option>
+                <option value="DESCARTADA" th:selected="${filtro.estado == 'DESCARTADA'}">Descartada</option>
             </select>
         </div>
-        <div style="flex: 1; min-width: 120px;">
-            <label style="display: block; font-size: 0.75rem; color: #9aa0ab; margin-bottom: 0.3rem;">Notificado</label>
-            <select id="filtroNotificado" style="width: 100%; padding: 0.45rem; background: #1a1e27; border: 1px solid #2b303b; border-radius: 6px; color: #fff; font-size: 0.8rem;">
-                <option value="">Todos</option>
-                <option value="Sí">Sí</option>
-                <option value="No">No</option>
-            </select>
+        <div class="filtro-campo">
+            <label for="filtroTrack">Track</label>
+            <input type="number" id="filtroTrack" name="trackId" min="0" placeholder="Ej: 16"
+                   th:value="${filtro.trackId}">
         </div>
-        <div>
-            <button id="btnLimpiarFiltros" style="padding: 0.45rem 0.9rem; background: #232834; border: 1px solid #3b4252; border-radius: 6px; color: #c8cdd6; font-size: 0.8rem; cursor: pointer;">Limpiar</button>
+        <div class="filtro-campo filtro-campo-ancho">
+            <label for="filtroQ">Buscar</label>
+            <input type="text" id="filtroQ" name="q" placeholder="EPP, rol, descripción, turno…"
+                   th:value="${filtro.q}">
         </div>
-    </div>
+        <div class="filtro-acciones">
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <a th:href="@{/historial}" class="btn btn-secondary">Limpiar</a>
+        </div>
+    </form>
 
     <table class="tabla-historial" id="tablaHistorial">
         <thead>
         <tr>
             <th>#</th>
-            <th>Hora</th>
+            <th>Fecha y hora</th>
             <th>Tipo</th>
             <th>Trabajador</th>
             <th>Descripción</th>
             <th>Prioridad</th>
+            <th>Estado</th>
             <th>Notificado</th>
+            <th>Confianza</th>
+            <th>Evidencia</th>
         </tr>
         </thead>
         <tbody id="cuerpoHistorial">
-        <tr th:each="a : ${historial}">
-            <td th:text="${a.id}"></td>
-            <td th:text="${a.horaFormateada}"></td>
-            <td th:text="${a.tituloVisual}"></td>
-            <td th:text="'#' + ${a.trabajadorCodigo}"></td>
-            <td th:text="${a.descripcion}"></td>
-            <td th:text="${a.prioridadTexto}"></td>
-            <td th:text="${a.notificadoJefeTurno} ? 'Sí' : 'No'"></td>
+        <tr th:if="${#lists.isEmpty(historial)}">
+            <td colspan="10" class="tabla-vacia">No hay alertas que coincidan con los filtros.</td>
+        </tr>
+        <tr th:each="a : ${historial}" th:classappend="${a.estadoAlerta == 'RESUELTA'} ? 'fila-resuelta' : ''">
+            <td th:text="${a.id}">1</td>
+            <td>
+                <div th:text="${a.fechaFormateada != null ? a.fechaFormateada : a.horaFormateada}">2026-10-26 14:30:00</div>
+                <div class="small" th:text="${a.turnoNombre}">Turno Guardia Día</div>
+            </td>
+            <td>
+                <span class="tag" th:classappend="${a.tipo == 'ANOMALIA'} ? 'tag-alta' : 'tag-media'"
+                      th:text="${a.tipo == 'ANOMALIA' ? 'Anomalía' : 'EPP'}">EPP</span>
+                <div class="small" th:if="${a.tipoInfraccion != null}" th:text="${a.tipoInfraccion}">FALTANTE</div>
+            </td>
+            <td>
+                <div th:if="${a.trackId != null}" th:text="'Track #' + ${a.trackId}">Track #16</div>
+                <div th:if="${a.trackId == null}"
+                     th:text="${a.rolNombre != null ? a.rolNombre : 'Punto de control'}">Punto de control</div>
+                <div class="small" th:if="${a.trackId != null and a.rolNombre != null}"
+                     th:text="${a.rolNombre}">Operador</div>
+            </td>
+            <td th:text="${a.descripcion}">Sin casco en el punto de control.</td>
+            <td>
+                <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : 'tag-media'"
+                      th:text="${a.prioridadTexto}">media</span>
+            </td>
+            <td>
+                <span class="tag"
+                      th:classappend="${a.estadoAlerta == 'RESUELTA' ? 'tag-resuelta' : (a.estadoAlerta == 'PENDIENTE' ? 'tag-pendiente' : 'tag-media')}"
+                      th:text="${a.estadoAlerta != null ? a.estadoAlerta : 'PENDIENTE'}">PENDIENTE</span>
+            </td>
+            <td th:text="${a.notificadoJefeTurno} ? 'Sí' : 'No'">No</td>
+            <td th:text="${a.confianzaPorcentaje}">87%</td>
+            <td>
+                <a th:if="${a.snapshotUrl != null and !#strings.isEmpty(a.snapshotUrl)}"
+                   th:href="${a.snapshotUrl}" target="_blank" rel="noopener">
+                    <img th:src="${a.snapshotUrl}" alt="Evidencia visual" class="historial-thumb" loading="lazy">
+                </a>
+                <span th:if="${a.snapshotUrl == null or #strings.isEmpty(a.snapshotUrl)}" class="small">—</span>
+            </td>
         </tr>
         </tbody>
     </table>
+
+    <div class="paginacion" th:if="${pagina.totalElements > 0}">
+        <span class="small">
+            Página <span th:text="${pagina.page + 1}">1</span> de <span th:text="${pagina.totalPages}">1</span>
+        </span>
+        <div class="paginacion-controles">
+            <a class="btn btn-secondary" th:classappend="${!pagina.hasPrevious} ? 'deshabilitado' : ''"
+               th:href="@{/historial(desde=${filtro.desde},hasta=${filtro.hasta},tipo=${filtro.tipo},estado=${filtro.estado},trackId=${filtro.trackId},q=${filtro.q},page=${pagina.previousPage},size=${filtro.size})}">
+                Anterior
+            </a>
+            <a class="btn btn-secondary" th:classappend="${!pagina.hasNext} ? 'deshabilitado' : ''"
+               th:href="@{/historial(desde=${filtro.desde},hasta=${filtro.hasta},tipo=${filtro.tipo},estado=${filtro.estado},trackId=${filtro.trackId},q=${filtro.q},page=${pagina.nextPage},size=${filtro.size})}">
+                Siguiente
+            </a>
+        </div>
+    </div>
 </main>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const inputHora = document.getElementById('filtroHora');
-        const selectTipo = document.getElementById('filtroTipo');
-        const inputTrabajador = document.getElementById('filtroTrabajador');
-        const selectPrioridad = document.getElementById('filtroPrioridad');
-        const selectNotificado = document.getElementById('filtroNotificado');
-        const btnLimpiar = document.getElementById('btnLimpiarFiltros');
-        const tbody = document.getElementById('cuerpoHistorial');
-        const filas = Array.from(tbody.querySelectorAll('tr'));
-
-        function aplicarFiltros() {
-            const valHora = inputHora.value.trim().toLowerCase();
-            const valTipo = selectTipo.value.trim().toLowerCase();
-            const valTrabajador = inputTrabajador.value.trim().toLowerCase();
-            const valPrioridad = selectPrioridad.value.trim().toLowerCase();
-            const valNotificado = selectNotificado.value.trim().toLowerCase();
-
-            filas.forEach(fila => {
-                const celdas = fila.querySelectorAll('td');
-                if (celdas.length < 7) return;
-
-                const textoHora = celdas[1].textContent.toLowerCase();
-                const textoTipo = celdas[2].textContent.toLowerCase();
-                const textoTrabajador = celdas[3].textContent.toLowerCase();
-                const textoPrioridad = celdas[5].textContent.toLowerCase();
-                const textoNotificado = celdas[6].textContent.toLowerCase();
-
-                const coincideHora = !valHora || textoHora.includes(valHora);
-                const coincideTipo = !valTipo || textoTipo.includes(valTipo);
-                const coincideTrabajador = !valTrabajador || textoTrabajador.includes(valTrabajador);
-                const coincidePrioridad = !valPrioridad || textoPrioridad === valPrioridad;
-                const coincideNotificado = !valNotificado || textoNotificado === valNotificado;
-
-                fila.style.display = (coincideHora && coincideTipo && coincideTrabajador && coincidePrioridad && coincideNotificado) ? '' : 'none';
-            });
-        }
-
-        [inputHora, selectTipo, inputTrabajador, selectPrioridad, selectNotificado].forEach(elem => {
-            elem.addEventListener('input', aplicarFiltros);
-            elem.addEventListener('change', aplicarFiltros);
-        });
-
-        btnLimpiar.addEventListener('click', () => {
-            inputHora.value = '';
-            selectTipo.value = '';
-            inputTrabajador.value = '';
-            selectPrioridad.value = '';
-            selectNotificado.value = '';
-            aplicarFiltros();
-        });
-    });
-</script>
 </body>
 </html>

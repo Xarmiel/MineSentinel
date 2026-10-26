@@ -21,22 +21,36 @@ public class ReporteExportService {
 
     /**
      * Genera un archivo CSV con el historial de alertas e infracciones registradas.
+     * El resultado corresponde exactamente a los filtros aplicados en la vista.
      */
     public byte[] generarCsvHistorialAlertas(List<AlertaViewDTO> alertas) {
         StringBuilder sb = new StringBuilder();
         // BOM UTF-8 para apertura correcta en Microsoft Excel
         sb.append('\ufeff');
-        sb.append("ID;Tipo;Titulo;Hora;Descripcion;Trabajador;Prioridad;Notificado_Jefe_Turno;Snapshot_URL\n");
+        sb.append("ID;Tipo;Titulo;Fecha_Hora;Hora;Descripcion;Trabajador;Track;Rol;Prioridad;Estado;Notificado_Jefe_Turno;Confianza;Turno;Snapshot_URL\n");
 
         for (AlertaViewDTO a : alertas) {
+            String fechaHora = a.getFechaHora() != null
+                    ? a.getFechaHora().format(FORMATO_FECHA_HORA)
+                    : (a.getFechaFormateada() != null ? a.getFechaFormateada() : "");
+            String confianza = a.getNivelConfianza() != null
+                    ? String.format(java.util.Locale.ROOT, "%.2f", a.getNivelConfianza())
+                    : "";
+
             sb.append(a.getId() != null ? a.getId() : "").append(";")
                     .append(escaparCsv(a.getTipo())).append(";")
                     .append(escaparCsv(a.getTituloVisual())).append(";")
+                    .append(escaparCsv(fechaHora)).append(";")
                     .append(escaparCsv(a.getHoraFormateada())).append(";")
                     .append(escaparCsv(a.getDescripcion())).append(";")
-                    .append(escaparCsv("#" + a.getTrabajadorCodigo())).append(";")
+                    .append(escaparCsv(a.getTrabajadorCodigo())).append(";")
+                    .append(a.getTrackId() != null ? a.getTrackId() : "").append(";")
+                    .append(escaparCsv(a.getRolNombre())).append(";")
                     .append(escaparCsv(a.getPrioridadTexto())).append(";")
+                    .append(escaparCsv(a.getEstadoAlerta())).append(";")
                     .append(a.isNotificadoJefeTurno() ? "SI" : "NO").append(";")
+                    .append(escaparCsv(confianza)).append(";")
+                    .append(escaparCsv(a.getTurnoNombre())).append(";")
                     .append(escaparCsv(a.getSnapshotUrl() != null ? a.getSnapshotUrl() : "N/A"))
                     .append("\n");
         }
@@ -192,6 +206,14 @@ public class ReporteExportService {
     private String escaparCsv(String valor) {
         if (valor == null) return "";
         String res = valor.replace("\"", "\"\"");
+        // Evita que Excel interprete como fórmula un texto que empieza por =, +, - o @.
+        if (!res.isEmpty()) {
+            char primero = res.charAt(0);
+            if (primero == '=' || primero == '+' || primero == '-' || primero == '@'
+                    || primero == '\t' || primero == '\r') {
+                res = "'" + res;
+            }
+        }
         if (res.contains(";") || res.contains("\n") || res.contains(",")) {
             return "\"" + res + "\"";
         }

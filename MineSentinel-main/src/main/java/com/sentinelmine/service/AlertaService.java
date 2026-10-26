@@ -1,19 +1,19 @@
 package com.sentinelmine.service;
 
 import com.sentinelmine.dto.AlertaViewDTO;
+import com.sentinelmine.dto.HistorialFiltro;
+import com.sentinelmine.dto.HistorialPagina;
 import com.sentinelmine.entity.AnomaliaMovimiento;
 import com.sentinelmine.entity.FaltaEPP;
 import com.sentinelmine.entity.enums.EstadoAlerta;
-import com.sentinelmine.repository.*;
+import com.sentinelmine.repository.AnomaliaMovimientoRepository;
+import com.sentinelmine.repository.FaltaEPPRepository;
+import com.sentinelmine.repository.HistorialRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -24,111 +24,56 @@ import java.util.List;
 public class AlertaService {
 
     private static final Logger log = LoggerFactory.getLogger(AlertaService.class);
+    private static final int LIMITE_EXPORTACION = 10_000;
 
     private final FaltaEPPRepository faltaEPPRepository;
     private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
+    private final HistorialRepository historialRepository;
     private final NotificacionExternaService notificacionExternaService;
     private final SseNotificationService sseNotificationService;
 
     public AlertaService(FaltaEPPRepository faltaEPPRepository,
                          AnomaliaMovimientoRepository anomaliaMovimientoRepository,
+                         HistorialRepository historialRepository,
                          NotificacionExternaService notificacionExternaService,
                          SseNotificationService sseNotificationService) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
+        this.historialRepository = historialRepository;
         this.notificacionExternaService = notificacionExternaService;
         this.sseNotificationService = sseNotificationService;
     }
 
+    /**
+     * Alertas más recientes para el dashboard y el panel de administración.
+     * Usa la misma consulta unificada del historial para que EPP y anomalías
+     * aparezcan ordenados por fecha real y no por claves primarias separadas.
+     */
     @Transactional(readOnly = true)
     public List<AlertaViewDTO> getAlertasRecientes(int limit) {
-        List<FaltaEPP> faltas = faltaEPPRepository.findUltimasFaltas(PageRequest.of(0, limit));
-        List<AlertaViewDTO> resultado = new ArrayList<>();
-        for (FaltaEPP f : faltas) {
-            String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
-            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Personal";
-            String codTrabajador = f.getRol() != null ? rolNombre : "N/I";
-            boolean notificado = f.getEstadoAlerta() == EstadoAlerta.NOTIFICADA || f.getEstadoAlerta() == EstadoAlerta.REVISADA;
-
-            resultado.add(new AlertaViewDTO(
-                    f.getFaltaId(),
-                    "EPP",
-                    "Infracción de EPP detectada (" + rolNombre + ")",
-                    hora,
-                    "Sin " + eppNombre + " en el punto de control de ingreso.",
-                    codTrabajador,
-                    "media",
-                    false,
-                    notificado,
-                    f.getSnapshotUrl()
-            ));
-        }
-        return resultado;
+        int tamano = Math.max(1, Math.min(limit, HistorialFiltro.PAGE_SIZE_MAX));
+        HistorialFiltro filtro = new HistorialFiltro();
+        filtro.setPage(0);
+        filtro.setSize(tamano);
+        return historialRepository.buscarLimitado(filtro, tamano);
     }
 
+    /**
+     * Página del historial con filtros aplicados en base de datos.
+     */
     @Transactional(readOnly = true)
-    public List<AlertaViewDTO> getHistorialCompleto() {
-        List<AlertaViewDTO> resultado = new ArrayList<>();
+    public HistorialPagina getHistorial(HistorialFiltro filtro) {
+        return historialRepository.buscar(filtro);
+    }
 
-        // 1. Cargar faltas de EPP
-        List<FaltaEPP> faltas = faltaEPPRepository.findUltimasFaltas(PageRequest.of(0, 50));
-        for (FaltaEPP f : faltas) {
-            String hora = f.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            String eppNombre = f.getEpp() != null ? f.getEpp().getNombre() : "EPP no especificado";
-            String rolNombre = f.getRol() != null ? f.getRol().getNombre() : "Personal";
-            String codTrabajador = f.getRol() != null ? rolNombre : "N/I";
-            EstadoAlerta estado = f.getEstadoAlerta();
-            boolean notificado = estado == EstadoAlerta.NOTIFICADA
-                    || estado == EstadoAlerta.REVISADA
-                    || estado == EstadoAlerta.RESUELTA;
-            String descripcionAlerta = "Sin " + eppNombre + " en el punto de control de ingreso.";
-            if (estado == EstadoAlerta.RESUELTA) {
-                descripcionAlerta = eppNombre + " repuesto. Infracción cerrada automáticamente por visión.";
-            }
-
-            resultado.add(new AlertaViewDTO(
-                    f.getFaltaId(),
-                    "EPP",
-                    "Infracción de EPP detectada (" + rolNombre + ")",
-                    hora,
-                    descripcionAlerta,
-                    codTrabajador,
-                    "media",
-                    false,
-                    notificado,
-                    f.getSnapshotUrl(),
-                    estado != null ? estado.name() : null
-            ));
-        }
-
-        // 2. Cargar anomalías de movimiento
-        List<AnomaliaMovimiento> anomalias = anomaliaMovimientoRepository.findUltimasAnomalias(PageRequest.of(0, 50));
-        for (AnomaliaMovimiento a : anomalias) {
-            String hora = a.getFechaHora().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-            String anomaliaNombre = a.getCatalogoAnomalia() != null ? a.getCatalogoAnomalia().getNombre() : "Anomalía no clasificada";
-            String codTrabajador = "Punto Control";
-            EstadoAlerta estado = a.getEstadoAlerta();
-            boolean notificado = estado == EstadoAlerta.NOTIFICADA || estado == EstadoAlerta.REVISADA;
-
-            resultado.add(new AlertaViewDTO(
-                    a.getAnomaliaId(),
-                    "ANOMALIA",
-                    "Alerta de seguridad / postura",
-                    hora,
-                    anomaliaNombre + " detectado en cámara.",
-                    codTrabajador,
-                    "alta",
-                    true,
-                    notificado,
-                    a.getSnapshotUrl(),
-                    estado != null ? estado.name() : null
-            ));
-        }
-
-        // Ordenar descendentemente por id
-        resultado.sort(Comparator.comparing(AlertaViewDTO::getId, Comparator.nullsLast(Comparator.reverseOrder())));
-        return resultado;
+    /**
+     * Resultado completo (hasta un límite de seguridad) de la consulta filtrada,
+     * para exportaciones. No reutiliza la página visible porque el usuario espera
+     * descargar todo lo que coincide con los filtros, no solo la página actual.
+     */
+    @Transactional(readOnly = true)
+    public List<AlertaViewDTO> getHistorialParaExportar(HistorialFiltro filtro) {
+        return historialRepository.buscarLimitado(filtro, LIMITE_EXPORTACION);
     }
 
     /**
