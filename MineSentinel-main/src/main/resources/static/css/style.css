@@ -428,10 +428,225 @@ body {
 .btn.deshabilitado { pointer-events: none; opacity: .45; }
 
 /* --------------------------------------------------------------------------
+   Dashboard mejorado - KPIs, Personas en Riesgo
+   -------------------------------------------------------------------------- */
+.kpi-strip {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: .9rem;
+    margin-bottom: 1.2rem;
+}
+
+.kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .9rem 1rem;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+}
+
+.kpi-label {
+    font-size: .7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+}
+
+.kpi-ok { color: var(--success-strong); }
+.kpi-warn { color: var(--warning-strong); }
+.kpi-danger { color: var(--danger-strong); }
+
+.dashboard-grid {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1.4fr 1fr;
+    gap: 1.2rem;
+    align-items: start;
+}
+
+.riesgo-card {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.card-header-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+
+.link-ver-todo {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .25rem .5rem;
+    border-radius: 6px;
+    transition: background .15s ease, color .15s ease;
+}
+
+.link-ver-todo:hover {
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+}
+
+.riesgo-lista {
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+}
+
+.riesgo-item {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--warning);
+    border-radius: var(--radius-sm);
+    padding: .8rem;
+}
+
+.riesgo-intermedio { border-left-color: var(--warning); }
+.riesgo-critico { border-left-color: var(--danger); }
+.riesgo-conforme { border-left-color: var(--success); }
+
+.riesgo-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .4rem;
+}
+
+.riesgo-header strong {
+    font-size: .85rem;
+}
+
+.riesgo-body {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-bottom: .6rem;
+}
+
+.riesgo-meta {
+    font-size: .72rem;
+    color: var(--text-muted);
+}
+
+.riesgo-faltantes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.chip-faltante {
+    display: inline-block;
+    padding: .15rem .5rem;
+    border-radius: 999px;
+    font-size: .65rem;
+    font-weight: 600;
+    background: var(--danger-soft);
+    color: var(--danger-strong);
+    border: 1px solid transparent;
+}
+
+.riesgo-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-mini {
+    display: inline-flex;
+    align-items: center;
+    padding: .28rem .6rem;
+    border-radius: 6px;
+    font-size: .72rem;
+    font-weight: 600;
+    text-decoration: none;
+    background: var(--surface);
+    color: var(--accent-strong);
+    border: 1px solid var(--border-strong);
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.btn-mini:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+}
+
+.estado-todo-ok {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: .4rem;
+    padding: 2rem 1rem;
+    color: var(--success-strong);
+}
+
+.ok-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--success-soft);
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.estado-todo-ok p {
+    font-size: .95rem;
+}
+
+.estado-todo-ok small {
+    color: var(--text-muted);
+    font-size: .78rem;
+}
+
+.sin-alertas {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: .82rem;
+    padding: 1rem;
+    font-style: italic;
+}
+
+/* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
+@media (max-width: 1100px) {
+    .kpi-strip { grid-template-columns: repeat(3, 1fr); }
+    .dashboard-grid { grid-template-columns: 1fr 1fr; }
+}
+
 @media (max-width: 800px) {
     .content { grid-template-columns: 1fr; }
+    .kpi-strip { grid-template-columns: 1fr 1fr; }
+    .dashboard-grid { grid-template-columns: 1fr; }
     .topbar { padding: .75rem 1rem; }
     .content, .content-single { padding: 1rem; }
+}
+
+@media (max-width: 500px) {
+    .kpi-strip { grid-template-columns: 1fr; }
 }

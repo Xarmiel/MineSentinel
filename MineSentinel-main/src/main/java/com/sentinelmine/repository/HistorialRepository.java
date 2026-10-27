@@ -165,6 +165,8 @@ public class HistorialRepository {
         boolean esAnomalia = "ANOMALIA".equalsIgnoreCase(tipo);
         boolean esImpostor = "IMPOSTOR".equalsIgnoreCase(tipoInfraccion);
         boolean resuelta = "RESUELTA".equalsIgnoreCase(estado);
+        boolean notificada = "NOTIFICADA".equalsIgnoreCase(estado);
+        boolean revisada = "REVISADA".equalsIgnoreCase(estado);
 
         String titulo;
         String descripcion;
@@ -173,8 +175,17 @@ public class HistorialRepository {
 
         if (esAnomalia) {
             titulo = "Alerta de seguridad / postura";
-            descripcion = (anomaliaNombre != null ? anomaliaNombre : "Anomalía no clasificada")
-                    + " detectada en cámara.";
+            if (resuelta) {
+                descripcion = (anomaliaNombre != null && !anomaliaNombre.isBlank()
+                        ? anomaliaNombre
+                        : "Anomalía detectada")
+                        + " corregida. Cerrado automáticamente por visión.";
+            } else {
+                descripcion = (anomaliaNombre != null && !anomaliaNombre.isBlank()
+                        ? anomaliaNombre
+                        : "Anomalía no clasificada")
+                        + " detectada en cámara. Requiere atención inmediata.";
+            }
             prioridad = "alta";
             prioridadAlta = true;
         } else {
@@ -185,25 +196,43 @@ public class HistorialRepository {
                 titulo += " (" + rolNombre + ")";
             }
 
+            String eppLabel = (eppNombre != null && !eppNombre.isBlank()) ? eppNombre : "EPP obligatorio";
+
             if (resuelta) {
-                descripcion = (eppNombre != null ? eppNombre : "EPP")
-                        + " repuesto. Infracción cerrada automáticamente por visión.";
+                if (esImpostor) {
+                    descripcion = "Uso de EPP no homologado: " + eppLabel
+                            + " sustituido por elemento homologado. Cerrado automáticamente por visión.";
+                } else {
+                    descripcion = "Todo correcto. Cumple con todos los EPP obligatorios (" + eppLabel
+                            + "). Cerrado automáticamente por visión.";
+                }
             } else if (descripcionRegistrada != null && !descripcionRegistrada.isBlank()) {
-                descripcion = descripcionRegistrada;
+                String desc = descripcionRegistrada.trim();
+                if (esImpostor && !desc.toLowerCase().contains("no homologado")) {
+                    descripcion = "Uso de EPP no homologado: " + eppLabel + ". " + desc;
+                } else if (!esImpostor && !desc.toLowerCase().contains("faltante") && !desc.toLowerCase().contains("sin ")) {
+                    descripcion = "Faltan EPP obligatorios: " + eppLabel + ". " + desc;
+                } else {
+                    descripcion = desc;
+                }
             } else if (esImpostor) {
-                descripcion = "Elemento no homologado en uso: "
-                        + (eppNombre != null ? eppNombre : "EPP no apto") + ".";
+                descripcion = "Uso de EPP no homologado: " + eppLabel
+                        + ". Elemento no apto o sin homologación para este puesto.";
             } else {
-                descripcion = "Sin " + (eppNombre != null ? eppNombre : "EPP")
-                        + " en el punto de control de ingreso.";
+                descripcion = "Faltan EPP obligatorios: " + eppLabel
+                        + ". Se requiere completar el equipo de protección obligatorio.";
             }
-            prioridad = esImpostor ? "alta" : "media";
-            prioridadAlta = esImpostor;
+
+            if (esImpostor || !resuelta) {
+                prioridad = "alta";
+                prioridadAlta = true;
+            } else {
+                prioridad = "baja";
+                prioridadAlta = false;
+            }
         }
 
-        boolean notificado = "NOTIFICADA".equalsIgnoreCase(estado)
-                || "REVISADA".equalsIgnoreCase(estado)
-                || "RESUELTA".equalsIgnoreCase(estado);
+        boolean notificado = notificada || revisada || resuelta;
 
         String trabajadorCodigo = trackId != null
                 ? String.valueOf(trackId)

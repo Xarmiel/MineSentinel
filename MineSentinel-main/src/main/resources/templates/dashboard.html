@@ -9,17 +9,31 @@
 <div th:replace="~{fragments/nav :: nav(${turno})}"></div>
 
 <main class="content">
-    <section class="camera-card">
-    <video id="videoCamara" autoplay playsinline class="camera-feed" style="display:none;"></video>
-    <div class="camera-placeholder" id="placeholderCamara">
-        <span class="camera-icon">📷</span>
-        <p>Activa la cámara para iniciar el monitoreo del punto de control.</p>
-        <p class="small">El vídeo se procesa localmente en el navegador.</p>
-        <button type="button" id="btnActivarCamara" class="btn btn-primary btn-camara">Activar cámara</button>
-    </div>
-</section>
 
-    <div>
+    <section class="kpi-strip">
+        <article class="kpi-card">
+            <span class="kpi-label">Críticos</span>
+            <span class="kpi-value kpi-danger" id="kpiCriticos">0</span>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">Intermedios</span>
+            <span class="kpi-value kpi-warn" id="kpiIntermedios">0</span>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">Conformes</span>
+            <span class="kpi-value kpi-ok" id="kpiConformes">0</span>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">Cumplimiento</span>
+            <span class="kpi-value" id="kpiCumplimiento">0%</span>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">Ocupación</span>
+            <span class="kpi-value" id="kpiOcupacion" th:text="${aforo.actual} + '/' + ${aforo.maximo}">0/50</span>
+        </article>
+    </section>
+
+    <div class="dashboard-grid">
         <section class="aforo-card">
             <div class="card-header">
                 <h3>Control de Aforo</h3>
@@ -37,13 +51,32 @@
             <p class="ultimo-evento">Último cruce de línea virtual<br><span id="ultimoEvento" th:text="${aforo.ultimoEvento}"></span></p>
         </section>
 
+        <section class="riesgo-card" id="cardPersonasRiesgo">
+            <div class="card-header">
+                <h3>Personas en Riesgo · En vivo</h3>
+                <div class="card-header-actions">
+                    <span id="badgeRiesgo" class="badge badge-alta">0 en riesgo</span>
+                    <a class="link-ver-todo" th:href="@{/camara}">Ver en Cámara</a>
+                </div>
+            </div>
+            <div id="contenedorRiesgo" class="riesgo-lista"></div>
+            <div id="estadoTodoOk" class="estado-todo-ok" style="display:none;">
+                <span class="ok-icon">✓</span>
+                <p><strong>Todo en orden</strong></p>
+                <small>Todos los trabajadores cumplen con sus EPP obligatorios</small>
+            </div>
+        </section>
+
         <section class="alertas-card">
             <div class="card-header">
-                <h3>Alertas Recientes</h3>
-                <span id="badgeAlertasConteo" class="badge" th:text="${#lists.size(alertas)} + ' eventos'">1 eventos</span>
+                <h3>Alertas Urgentes</h3>
+                <div class="card-header-actions">
+                    <span id="badgeAlertasConteo" class="badge" th:text="${#lists.size(alertas)} + ' eventos'">1 eventos</span>
+                    <a class="link-ver-todo" th:href="@{/historial}">Ver todo</a>
+                </div>
             </div>
             <div id="contenedorAlertas">
-                <div class="alerta" th:each="a : ${alertas}" th:classappend="${a.prioridadAlta} ? 'alerta-alta' : ''">
+                <div class="alerta" th:each="a : ${alertas}" th:classappend="${a.prioridadAlta} ? 'alerta-alta' : (${a.estadoAlerta == 'RESUELTA'} ? 'alerta-resuelta' : '')">
                     <div class="alerta-header">
                         <strong th:text="${a.tituloVisual}">Infracción de EPP detectada</strong>
                         <span class="hora" th:text="${a.horaFormateada}"></span>
@@ -51,8 +84,8 @@
                     <p th:text="${a.descripcion}"></p>
                     <div class="alerta-footer">
                         <span class="tag" th:text="'TRABAJADOR #' + ${a.trabajadorCodigo}"></span>
-                        <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : 'tag-media'"
-                              th:text="'Prioridad ' + ${a.prioridadTexto}"></span>
+                        <span class="tag" th:classappend="${a.prioridadAlta} ? 'tag-alta' : (${a.estadoAlerta == 'RESUELTA'} ? 'tag-resuelta' : 'tag-media')"
+                              th:text="${a.estadoAlerta == 'RESUELTA'} ? 'Resuelta por visión' : ('Prioridad ' + ${a.prioridadTexto})"></span>
                     </div>
                 </div>
             </div>
@@ -60,38 +93,93 @@
     </div>
 </main>
 <script>
-    const btnActivarCamara = document.getElementById('btnActivarCamara');
-    const videoCamara = document.getElementById('videoCamara');
-    const placeholderCamara = document.getElementById('placeholderCamara');
-    const mensajeCamara = placeholderCamara.querySelector('p');
+    async function cargarCuadroEpp() {
+        try {
+            const res = await fetch('/api/v1/vision/cuadro');
+            if (!res.ok) return;
+            const data = await res.json();
+            renderizarPersonasRiesgo(data);
+        } catch (e) {
+            console.error('No se pudo cargar el cuadro EPP:', e);
+        }
+    }
 
-    if (btnActivarCamara) {
-        btnActivarCamara.addEventListener('click', async () => {
-            if (videoCamara.srcObject) return;
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                mensajeCamara.textContent = 'El navegador no permite usar la cámara desde esta dirección. Abre el sistema en localhost o HTTPS.';
-                return;
-            }
+    function renderizarPersonasRiesgo(cuadro) {
+        const lista = cuadro?.personas || [];
+        const criticos = lista.filter(p => p.estado === 'CRITICO').length;
+        const intermedios = lista.filter(p => p.estado === 'INTERMEDIO').length;
+        const conformes = lista.filter(p => p.estado === 'CONFORME').length;
+        const total = lista.length;
 
-            btnActivarCamara.disabled = true;
-            btnActivarCamara.textContent = 'Conectando…';
-            mensajeCamara.textContent = 'Solicitando acceso a la cámara…';
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                videoCamara.srcObject = stream;
-                videoCamara.style.display = 'block';
-                placeholderCamara.style.display = 'none';
-            } catch (err) {
-                const mensajes = {
-                    NotAllowedError: 'Permite el acceso a la cámara en el navegador y vuelve a intentarlo.',
-                    NotFoundError: 'No se encontró ninguna cámara conectada.',
-                    NotReadableError: 'La cámara está ocupada por otra aplicación.'
-                };
-                mensajeCamara.textContent = mensajes[err.name] || 'No se pudo iniciar la cámara: ' + err.message;
-                btnActivarCamara.disabled = false;
-                btnActivarCamara.textContent = 'Reintentar cámara';
+        const kpiCriticos = document.getElementById('kpiCriticos');
+        const kpiIntermedios = document.getElementById('kpiIntermedios');
+        const kpiConformes = document.getElementById('kpiConformes');
+        const kpiCumplimiento = document.getElementById('kpiCumplimiento');
+        if (kpiCriticos) kpiCriticos.textContent = criticos;
+        if (kpiIntermedios) kpiIntermedios.textContent = intermedios;
+        if (kpiConformes) kpiConformes.textContent = conformes;
+        if (kpiCumplimiento) {
+            const porcentaje = total > 0 ? Math.round((conformes / total) * 100) : 100;
+            kpiCumplimiento.textContent = porcentaje + '%';
+        }
+
+        const riesgo = lista
+            .filter(p => p.estado === 'INTERMEDIO' || p.estado === 'CRITICO')
+            .sort((a, b) => {
+                if (a.estado === 'CRITICO' && b.estado !== 'CRITICO') return -1;
+                if (a.estado !== 'CRITICO' && b.estado === 'CRITICO') return 1;
+                return (a.trackId || 0) - (b.trackId || 0);
+            });
+
+        const badgeRiesgo = document.getElementById('badgeRiesgo');
+        if (badgeRiesgo) {
+            badgeRiesgo.textContent = riesgo.length + (riesgo.length === 1 ? ' en riesgo' : ' en riesgo');
+            if (criticos > 0) {
+                badgeRiesgo.className = 'badge badge-alta';
+            } else if (intermedios > 0) {
+                badgeRiesgo.className = 'badge badge-media';
+            } else {
+                badgeRiesgo.className = 'badge badge-success';
+                badgeRiesgo.textContent = 'Sin riesgos';
             }
-        });
+        }
+
+        const contenedor = document.getElementById('contenedorRiesgo');
+        const estadoTodoOk = document.getElementById('estadoTodoOk');
+        if (!contenedor) return;
+
+        if (riesgo.length === 0) {
+            contenedor.innerHTML = '';
+            if (estadoTodoOk) estadoTodoOk.style.display = 'flex';
+            return;
+        }
+        if (estadoTodoOk) estadoTodoOk.style.display = 'none';
+
+        contenedor.innerHTML = riesgo.slice(0, 4).map(p => {
+            const estado = (p.estado || '').toLowerCase();
+            const obligatorios = p.obligatorios || 0;
+            const conformesCount = p.conformes || 0;
+            const faltantes = p.faltantes || [];
+            const chipsFaltantes = faltantes.map(f => {
+                const nombre = f.nombre || f.clave || 'EPP';
+                return `<span class="chip-faltante">${nombre}</span>`;
+            }).join('');
+            return `
+                <div class="riesgo-item riesgo-${estado}">
+                    <div class="riesgo-header">
+                        <strong>TRABAJADOR #${p.trackId ?? 'N/I'}</strong>
+                        <span class="chip chip-${estado}">${p.estado || 'DESCONOCIDO'}</span>
+                    </div>
+                    <div class="riesgo-body">
+                        <span class="riesgo-meta">${conformesCount}/${obligatorios} EPP completos</span>
+                        ${chipsFaltantes ? '<div class="riesgo-faltantes">' + chipsFaltantes + '</div>' : ''}
+                    </div>
+                    <div class="riesgo-footer">
+                        <a class="btn-mini" href="/camara">Ver en Cámara</a>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     async function refrescarDashboard() {
@@ -119,17 +207,38 @@
                 if (elLabel) elLabel.textContent = data.porcentaje + '% de capacidad';
                 const elUltimo = document.getElementById('ultimoEvento');
                 if (elUltimo && data.ultimoEvento) elUltimo.textContent = data.ultimoEvento;
+                const kpiOcupacion = document.getElementById('kpiOcupacion');
+                if (kpiOcupacion && data.actual != null && data.maximo != null) {
+                    kpiOcupacion.textContent = data.actual + '/' + data.maximo;
+                }
             }
 
-            const resAlertas = await fetch('/api/v1/alertas/recientes?limit=3');
+            const resAlertas = await fetch('/api/v1/alertas/recientes?limit=5');
             if (resAlertas.ok) {
                 const alertas = await resAlertas.json();
+                const alertasOrdenadas = [...alertas].sort((a, b) => {
+                    if (a.estadoAlerta === 'RESUELTA' && b.estadoAlerta !== 'RESUELTA') return 1;
+                    if (a.estadoAlerta !== 'RESUELTA' && b.estadoAlerta === 'RESUELTA') return -1;
+                    if (a.prioridadAlta && !b.prioridadAlta) return -1;
+                    if (!a.prioridadAlta && b.prioridadAlta) return 1;
+                    return 0;
+                });
+
                 const elConteo = document.getElementById('badgeAlertasConteo');
                 if (elConteo) elConteo.textContent = alertas.length + ' eventos';
                 const contenedor = document.getElementById('contenedorAlertas');
-                if (contenedor && alertas.length > 0) {
-                    contenedor.innerHTML = alertas.map(a => `
-                        <div class="alerta ${a.prioridadAlta ? 'alerta-alta' : ''}">
+                if (contenedor) {
+                    if (alertasOrdenadas.length === 0) {
+                        contenedor.innerHTML = '<p class="sin-alertas">Sin alertas recientes.</p>';
+                        return;
+                    }
+                    contenedor.innerHTML = alertasOrdenadas.map(a => {
+                        const esResuelta = a.estadoAlerta === 'RESUELTA';
+                        const claseAlerta = a.prioridadAlta ? 'alerta-alta' : (esResuelta ? 'alerta-resuelta' : '');
+                        const claseTag = a.prioridadAlta ? 'tag-alta' : (esResuelta ? 'tag-resuelta' : 'tag-media');
+                        const textoTag = esResuelta ? 'Resuelta por visión' : ('Prioridad ' + (a.prioridadTexto || 'Media'));
+                        return `
+                        <div class="alerta ${claseAlerta}">
                             <div class="alerta-header">
                                 <strong>${a.tituloVisual || 'Alerta de Seguridad'}</strong>
                                 <span class="hora">${a.horaFormateada || ''}</span>
@@ -137,10 +246,11 @@
                             <p>${a.descripcion || ''}</p>
                             <div class="alerta-footer">
                                 <span class="tag">TRABAJADOR #${a.trabajadorCodigo || ''}</span>
-                                <span class="tag ${a.prioridadAlta ? 'tag-alta' : 'tag-media'}">Prioridad ${a.prioridadTexto || 'Media'}</span>
+                                <span class="tag ${claseTag}">${textoTag}</span>
                             </div>
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
                 }
             }
         } catch (err) {
@@ -161,6 +271,14 @@
             source.addEventListener('turno-update', (e) => {
                 refrescarDashboard();
             });
+            source.addEventListener('cuadro-epp', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    renderizarPersonasRiesgo(data);
+                } catch (err) {
+                    console.debug('Error al parsear cuadro-epp SSE:', err);
+                }
+            });
             source.onerror = (e) => {
                 console.debug('Reconectando SSE...');
             };
@@ -168,6 +286,7 @@
     }
     iniciarStreamSSE();
     setInterval(refrescarDashboard, 3000);
+    cargarCuadroEpp();
     refrescarDashboard();
 </script>
 </body>
