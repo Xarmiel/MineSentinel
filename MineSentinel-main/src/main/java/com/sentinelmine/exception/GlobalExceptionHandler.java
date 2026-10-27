@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.stream.Collectors;
 
@@ -58,6 +59,13 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    // El navegador cerró una respuesta en streaming (p. ej. al salir de /camara):
+    // es el final normal del MJPEG, no un error que deba ensuciar el log.
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClienteDesconectado(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        log.debug("Cliente desconectado de {}: {}", request.getRequestURI(), ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

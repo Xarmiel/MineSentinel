@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface FaltaEPPRepository extends JpaRepository<FaltaEPP, Long> {
@@ -34,6 +35,16 @@ public interface FaltaEPPRepository extends JpaRepository<FaltaEPP, Long> {
            "LEFT JOIN FETCH f.rol " +
            "ORDER BY f.fechaHora DESC")
     List<FaltaEPP> findUltimasFaltas(Pageable pageable);
+
+    // Con open-in-view=false la entidad se serializa fuera de la sesión: sin
+    // JOIN FETCH, Jackson recibe proxies LAZY y la respuesta falla con 500.
+    @Query("SELECT f FROM FaltaEPP f " +
+           "JOIN FETCH f.epp " +
+           "JOIN FETCH f.eventoTurno e " +
+           "JOIN FETCH e.turno " +
+           "LEFT JOIN FETCH f.rol " +
+           "WHERE f.faltaId = :id")
+    Optional<FaltaEPP> findByIdWithDetails(@Param("id") Long id);
 
     @Query("SELECT f FROM FaltaEPP f " +
            "JOIN FETCH f.epp " +

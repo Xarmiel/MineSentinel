@@ -371,42 +371,41 @@
         placeholderCamara.style.display = 'none';
     }
 
-    // El backend responde 204 mientras el motor no publique, en vez de repetir
-    // el ultimo frame. Asi "sin senal" y "video congelado" quedan distinguibles,
-    // que es justo lo que hace dudoso a un supervisor.
-    async function pedirFrame() {
+    // El video llega como MJPEG continuo (VisionStreamService): el <img> pinta cada
+    // frame según lo publica el motor, sin sondear JPEG sueltos. "Sin senal" se
+    // decide con /estado porque un <img> MJPEG no avisa cuando deja de recibir
+    // frames: se quedaria con la ultima imagen congelada.
+    const URL_STREAM = '/api/v1/vision/stream.mjpg';
+    const SIN_SENAL_MS = 3000;
+
+    function conectarStream() {
+        if (marcoMotor.getAttribute('src')) return;
+        marcoMotor.src = URL_STREAM + '?t=' + Date.now();
+        ocultarPlaceholder();
+    }
+
+    // Si el backend corta la conexion, se suelta el src y la siguiente
+    // comprobacion reconecta.
+    marcoMotor.addEventListener('error', () => mostrarPlaceholder('Motor de vision sin senal'));
+
+    async function comprobarSenal() {
         try {
-            const res = await fetch('/api/v1/vision/frame', { cache: 'no-store' });
-            if (res.status === 204 || !res.ok) {
+            const res = await fetch('/api/v1/vision/estado', { cache: 'no-store' });
+            const estado = res.ok ? await res.json() : null;
+            const ms = estado ? estado.msDesdeUltimoFrameStream : -1;
+            if (ms >= 0 && ms < SIN_SENAL_MS) {
+                conectarStream();
+            } else {
                 mostrarPlaceholder('Motor de vision sin senal');
-                return;
             }
-
-            const blob = await res.blob();
-            const contentType = (res.headers.get('content-type') || blob.type || '').toLowerCase();
-            const esImagen = contentType.startsWith('image/') || blob.size > 0;
-            if (!esImagen || blob.size < 100) {
-                mostrarPlaceholder('Motor de vision sin senal');
-                return;
-            }
-
-            const url = URL.createObjectURL(blob);
-            const anterior = marcoMotor.getAttribute('src');
-            marcoMotor.src = url;
-            if (anterior) URL.revokeObjectURL(anterior);
-            ocultarPlaceholder();
         } catch (err) {
-            console.warn('No se pudo obtener el frame:', err);
+            console.warn('No se pudo consultar el estado del motor:', err);
             mostrarPlaceholder('Motor de vision sin senal');
         }
     }
 
-    // El motor publica cada 2 fotogramas a ~3 fps, o sea una imagen nueva cada
-    // ~650 ms. Sondear mas rapido que eso solo gasta peticiones, y mas lento
-    // hace que el video parezca congelado aunque el motor este trabajando.
-    const cadenciaFrame = 700;
-    pedirFrame();
-    setInterval(pedirFrame, cadenciaFrame);
+    comprobarSenal();
+    setInterval(comprobarSenal, 1000);
 
     // Se conecta al final y no al declarar la función: pintarCuadro() toca el
     // overlay, que aún no existe como elemento hasta que se declara `overlay`

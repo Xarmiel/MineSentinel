@@ -1,14 +1,19 @@
 package com.sentinelmine.service;
 
 import com.sentinelmine.dto.AforoDTO;
+import com.sentinelmine.entity.ConfiguracionAforo;
 import com.sentinelmine.entity.EventoTurno;
 import com.sentinelmine.entity.MovimientoAforo;
 import com.sentinelmine.entity.RolPersonal;
 import com.sentinelmine.entity.enums.EstadoTurno;
 import com.sentinelmine.entity.enums.TipoMovimiento;
+import com.sentinelmine.repository.ConfiguracionAforoRepository;
 import com.sentinelmine.repository.EventoTurnoRepository;
 import com.sentinelmine.repository.MovimientoAforoRepository;
 import com.sentinelmine.repository.RolPersonalRepository;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -26,27 +31,67 @@ import java.util.List;
 @Service
 public class AforoService {
 
+    private static final Logger log = LoggerFactory.getLogger(AforoService.class);
+
     private final MovimientoAforoRepository movimientoAforoRepository;
     private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
 
+    private final ConfiguracionAforoRepository configuracionAforoRepository;
+
+    // Valores por defecto de application.properties; los reemplaza la fila de
+    // configuracion_aforo si el administrador ya los cambió.
     @Value("${minesentinel.aforo.maximo:50}")
-    private int aforoMaximo;
+    private volatile int aforoMaximo;
 
     @Value("${minesentinel.aforo.minimo:10}")
-    private int aforoMinimo;
+    private volatile int aforoMinimo;
 
     private volatile String ultimoEvento = "20:18:11 - Ingreso bloqueado — Trabajador #16, EPP incompleto";
 
     public AforoService(MovimientoAforoRepository movimientoAforoRepository,
                         EventoTurnoRepository eventoTurnoRepository,
                         RolPersonalRepository rolPersonalRepository,
-                        EventoTurnoService eventoTurnoService) {
+                        EventoTurnoService eventoTurnoService,
+                        ConfiguracionAforoRepository configuracionAforoRepository) {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
+        this.configuracionAforoRepository = configuracionAforoRepository;
+    }
+
+    @PostConstruct
+    void cargarLimites() {
+        try {
+            configuracionAforoRepository.findById(ConfiguracionAforo.ID_UNICO).ifPresent(c -> {
+                aforoMaximo = c.getAforoMaximo();
+                aforoMinimo = c.getAforoMinimo();
+            });
+        } catch (Exception e) {
+            // Sin base de datos al arrancar se sigue con los valores por defecto.
+            log.warn("No se pudieron cargar los límites de aforo guardados: {}", e.getMessage());
+        }
+    }
+
+    public int getAforoMaximo() {
+        return aforoMaximo;
+    }
+
+    public int getAforoMinimo() {
+        return aforoMinimo;
+    }
+
+    /** Cambia y persiste los límites de aforo (sólo el administrador). */
+    @Transactional
+    public void actualizarLimites(int maximo, int minimo) {
+        if (maximo < 1 || minimo < 0 || minimo > maximo) {
+            throw new IllegalArgumentException("El máximo debe ser al menos 1 y el mínimo estar entre 0 y el máximo.");
+        }
+        configuracionAforoRepository.save(new ConfiguracionAforo(maximo, minimo));
+        aforoMaximo = maximo;
+        aforoMinimo = minimo;
     }
 
     /**

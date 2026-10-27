@@ -188,7 +188,7 @@ public class SeguridadInfraccionService {
      */
     @Transactional
     public FaltaEPP resolverFaltaEPP(InfraccionResolucionRequestDTO dto) {
-        FaltaEPP falta = faltaEPPRepository.findById(dto.getFaltaId())
+        FaltaEPP falta = faltaEPPRepository.findByIdWithDetails(dto.getFaltaId())
                 .orElseThrow(() -> new IllegalArgumentException("Falta de EPP no encontrada #" + dto.getFaltaId()));
 
         if (falta.getEstadoAlerta() == EstadoAlerta.RESUELTA

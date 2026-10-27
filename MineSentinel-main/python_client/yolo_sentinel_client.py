@@ -20,8 +20,11 @@ import io
 import logging
 import os
 import random
+import struct
 import sys
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -96,6 +99,10 @@ class MineSentinelClient:
         self.session = requests.Session()
         self.catalogo = catalogo or CatalogoResolver(self.base_url)
         self.track_counter = 100
+        # Último frame pendiente del stream MJPEG; el hilo emisor arranca con el primero.
+        self._stream_cond = threading.Condition()
+        self._stream_frame: Optional[bytes] = None
+        self._stream_hilo: Optional[threading.Thread] = None
 
     # =========================================================================
     # CONEXIÓN
@@ -296,6 +303,39 @@ class MineSentinelClient:
             logger.error("Fallo en envío de frame: %s", e)
         return False
 
+    def publicar_stream(self, jpeg: bytes) -> None:
+        """Entrega un frame al hilo que alimenta el MJPEG de /camara.
+
+        No bloquea: si la red va lenta se pisa el frame pendiente en vez de
+        encolarlo, porque al panel sólo le interesa el presente y la detección
+        no debe esperar a la red.
+        """
+        with self._stream_cond:
+            self._stream_frame = jpeg
+            self._stream_cond.notify()
+        if self._stream_hilo is None:
+            self._stream_hilo = threading.Thread(target=self._bucle_stream, name="stream-mjpeg", daemon=True)
+            self._stream_hilo.start()
+
+    def _frames_stream(self):
+        while True:
+            with self._stream_cond:
+                while self._stream_frame is None:
+                    self._stream_cond.wait()
+                jpeg, self._stream_frame = self._stream_frame, None
+            # Formato de VisionStreamService.recibir: longitud big-endian de 4 bytes + JPEG.
+            yield struct.pack(">I", len(jpeg)) + jpeg
+
+    def _bucle_stream(self) -> None:
+        """Mantiene UNA petición POST abierta (chunked) y la reabre si se corta."""
+        while True:
+            try:
+                requests.post(f"{self.base_url}/api/v1/vision/stream", data=self._frames_stream(),
+                              headers={"Content-Type": "application/octet-stream"}, timeout=(5, None))
+            except Exception as e:
+                logger.warning("Stream de video cortado (%s); reintentando", e)
+            time.sleep(1)
+
     def enviar_falta_epp(self, epp_id: int, rol_id: int, confianza: float, snapshot_url: str) -> bool:
         """Atajo retrocompatible: registra una falta de EPP sin tipo explícito."""
         return self.enviar_infraccion(epp_id, rol_id, confianza, snapshot_url, "FALTANTE", "")
@@ -404,6 +444,9 @@ class PipelineEPP:
         self.mostrar = mostrar
         self.dry_run = dry_run
         self.backend_camara = backend_camara
+        # Ejecutor de las llamadas que tocan la base de datos. Sólo existe dentro de
+        # procesar_fuente(); fuera de él (pruebas, imagen única) todo corre en línea.
+        self._fondo: Optional[ThreadPoolExecutor] = None
         self.lado_por_track: Dict[int, str] = {}
         self.total_movimientos = 0
         self.total_infracciones = 0
@@ -441,7 +484,7 @@ class PipelineEPP:
             if self.dry_run:
                 logger.info("[DRY-RUN] %s del track #%s", tipo, persona.track_id)
             else:
-                self.cliente.enviar_movimiento_aforo(tipo, persona.track_id, self.rol_id)
+                self._en_fondo(self.cliente.enviar_movimiento_aforo, tipo, persona.track_id, self.rol_id)
 
         for track_id in list(self.lado_por_track):
             if track_id not in {p.track_id for p in analisis.personas}:
@@ -457,37 +500,93 @@ class PipelineEPP:
         enfriamiento, sin resolución automática). La imagen única usa el camino
         completo porque es un análisis de un solo frame sin ciclo de vida.
         """
-        if not analisis.infracciones:
+        # Sólo lo que de verdad se envía: antes se subía un snapshot por cada frame con
+        # faltas de EPP aunque en vivo esas faltas no se reporten por aquí.
+        enviar = [i for i in analisis.infracciones if i.es_anomalia or incluir_epp]
+        if not enviar:
             return
 
-        snapshot_url = ""
-        if not self.dry_run and analisis.imagen_anotada is not None:
-            snapshot_url = self.cliente.subir_evidencia(
-                analisis.imagen_anotada, f"epp_track_{analisis.fotograma}.jpg"
-            )
+        self.total_infracciones += len(enviar)
+        if self.dry_run:
+            for infraccion in enviar:
+                logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
+                            infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
+            return
 
-        for infraccion in analisis.infracciones:
+        self._en_fondo(self._enviar_infracciones, enviar, self._copia_imagen(analisis), analisis.fotograma)
+
+    def _enviar_infracciones(self, infracciones, imagen, fotograma) -> None:
+        snapshot_url = ""
+        if imagen is not None:
+            snapshot_url = self.cliente.subir_evidencia(imagen, f"epp_track_{fotograma}.jpg")
+
+        for infraccion in infracciones:
             if infraccion.es_anomalia:
-                self.total_infracciones += 1
-                if self.dry_run:
-                    logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
-                                infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
-                    continue
                 self.cliente.enviar_anomalia(
                     self.cliente.catalogo.anomalia_id(infraccion.nombre_catalogo),
                     self.rol_id, infraccion.confianza, snapshot_url,
                 )
-            elif incluir_epp:
-                self.total_infracciones += 1
-                if self.dry_run:
-                    logger.info("[DRY-RUN] %s | %s | conf %.2f | track %s",
-                                infraccion.tipo, infraccion.descripcion, infraccion.confianza, infraccion.track_id)
-                    continue
+            else:
                 self.cliente.enviar_infraccion(
                     self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
                     self.rol_id, infraccion.confianza, snapshot_url,
                     infraccion.tipo, infraccion.descripcion, infraccion.track_id,
                 )
+
+    # -------------------------------------------------------------------------
+    # LLAMADAS AL BACKEND FUERA DEL BUCLE DE VIDEO
+    # -------------------------------------------------------------------------
+
+    def _en_fondo(self, tarea, *args) -> Future:
+        """Ejecuta una llamada al backend sin frenar el video.
+
+        Cada alta en Supabase tarda cientos de ms; hechas en el bucle congelaban
+        el video segundos cuando entraba una persona con varias faltas. Un único
+        hilo las procesa en orden, así un cierre nunca adelanta a su apertura.
+        Sin ejecutor corre en línea y devuelve un Future ya resuelto.
+        """
+        if self._fondo is None:
+            futuro = Future()
+            futuro.set_result(self._tarea_segura(tarea, *args))
+            return futuro
+        return self._fondo.submit(self._tarea_segura, tarea, *args)
+
+    @staticmethod
+    def _tarea_segura(tarea, *args):
+        # En un hilo de fondo una excepción se perdería en silencio dentro del Future.
+        try:
+            return tarea(*args)
+        except Exception:
+            logger.exception("Fallo en llamada al backend en segundo plano")
+            return None
+
+    @staticmethod
+    def _copia_imagen(analisis):
+        # El envío ocurre más tarde, en otro hilo: se congela la imagen de este frame.
+        imagen = analisis.imagen_anotada
+        return None if imagen is None else imagen.copy()
+
+    def _abrir_episodio(self, imagen, fotograma, infraccion, confianza) -> Optional[int]:
+        snapshot_url = ""
+        if imagen is not None:
+            snapshot_url = self.cliente.subir_evidencia(imagen, f"epp_abrir_{fotograma}.jpg")
+        return self.cliente.enviar_infraccion(
+            self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
+            self.rol_id, confianza, snapshot_url,
+            infraccion.tipo, infraccion.descripcion, infraccion.track_id,
+        )
+
+    def _cerrar_episodio(self, apertura: Future, track_id: int) -> None:
+        # La apertura ya terminó: va antes en la misma cola de un solo hilo.
+        falta_id = apertura.result()
+        if falta_id:
+            self.cliente.resolver_infraccion(falta_id, track_id=track_id,
+                                             motivo="EPP repuesto por el trabajador")
+
+    def _descartar_si_fallo(self, key, apertura: Future) -> None:
+        # Si el alta falló no hay alerta que cerrar: se suelta la clave para reintentar.
+        if not apertura.result() and self._abiertas.get(key) is apertura:
+            self._abiertas.pop(key, None)
 
     # -------------------------------------------------------------------------
     # CICLO DE VIDA DE LA INFRACCIÓN (apertura y cierre de episodio)
@@ -535,8 +634,7 @@ class PipelineEPP:
                 if self.dry_run:
                     logger.info("[DRY-RUN] RESUELTA track #%s | falta #%s", track_id, falta_id)
                 else:
-                    self.cliente.resolver_infraccion(
-                        falta_id, track_id=track_id, motivo="EPP repuesto por el trabajador")
+                    self._en_fondo(self._cerrar_episodio, falta_id, track_id)
                 self._abiertas.pop(key, None)
                 self._cuenta_cerrar.pop(key, None)
             else:
@@ -583,18 +681,12 @@ class PipelineEPP:
                             key[0], infraccion.tipo, infraccion.descripcion, confianza_promedio, tiempo_visible)
                 continue
 
-            snapshot_url = ""
-            if analisis.imagen_anotada is not None:
-                snapshot_url = self.cliente.subir_evidencia(
-                    analisis.imagen_anotada, f"epp_abrir_{analisis.fotograma}.jpg")
-
-            falta_id = self.cliente.enviar_infraccion(
-                self.cliente.catalogo.epp_id(infraccion.nombre_catalogo),
-                self.rol_id, confianza_promedio, snapshot_url,
-                infraccion.tipo, infraccion.descripcion, infraccion.track_id,
-            )
-            if falta_id:
-                self._abiertas[key] = falta_id
+            # Se guarda el Future, no el id: el alta corre en segundo plano y el
+            # cierre lo resuelve cuando le toca en la cola.
+            apertura = self._en_fondo(self._abrir_episodio, self._copia_imagen(analisis),
+                                      analisis.fotograma, infraccion, confianza_promedio)
+            self._abiertas[key] = apertura
+            apertura.add_done_callback(lambda f, k=key: self._descartar_si_fallo(k, f))
 
         # Limpieza de contadores de claves que ya no aplican (ni abiertas ni
         # incumpliendo): evita que un contador viejo dispare una apertura
@@ -646,11 +738,25 @@ class PipelineEPP:
         """
         if not getattr(self.detector, "cuadro_publicar_frame", False):
             return
+        jpeg = self._codificar_frame(analisis)
+        if jpeg:
+            self.cliente.enviar_frame(jpeg)
+
+    def _publicar_stream(self, analisis) -> None:
+        """Publica CADA frame en el MJPEG de /camara; el envío corre en otro hilo."""
+        if self.dry_run or not getattr(self.detector, "cuadro_publicar_frame", False):
+            return
+        jpeg = self._codificar_frame(analisis)
+        if jpeg:
+            self.cliente.publicar_stream(jpeg)
+
+    def _codificar_frame(self, analisis) -> Optional[bytes]:
+        """Imagen anotada reescalada a `ancho_maximo` y codificada a JPEG."""
         import cv2
 
         imagen = analisis.imagen_anotada
         if imagen is None:
-            return
+            return None
 
         ancho = int(getattr(self.detector, "cuadro_ancho_maximo", 960))
         if ancho and imagen.shape[1] > ancho:
@@ -661,15 +767,15 @@ class PipelineEPP:
         ok, buffer = cv2.imencode(".jpg", imagen, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
         if not ok:
             logger.warning("No se pudo codificar el frame a JPEG")
-            return
-
-        self.cliente.enviar_frame(buffer.tobytes())
+            return None
+        return buffer.tobytes()
 
     def procesar_fuente(self, fuente) -> None:
         """Lee la fuente de video frame a frame hasta agotarla o Ctrl+C."""
         import cv2
 
         processed = 0
+        self._fondo = ThreadPoolExecutor(max_workers=1, thread_name_prefix="reportes")
         try:
             while True:
                 exito, frame = fuente.read()
@@ -682,6 +788,7 @@ class PipelineEPP:
                 self._reportar_infracciones(analisis, incluir_epp=False)
                 self._sincronizar_episodios(analisis)
                 self._publicar_cuadro(analisis)
+                self._publicar_stream(analisis)
 
                 if processed % 30 == 0:
                     logger.info("Frame %s | %d personas | %d movimientos | %d infracciones | %d resueltas | %.1f fps",
@@ -696,6 +803,9 @@ class PipelineEPP:
         finally:
             if self.mostrar:
                 cv2.destroyAllWindows()
+            # Se espera a que salgan los reportes pendientes: son alertas reales.
+            self._fondo.shutdown(wait=True)
+            self._fondo = None
 
         logger.info("Procesados %d frames | %d movimientos de aforo | %d infracciones abiertas | %d resueltas",
                     processed, self.total_movimientos, self.total_infracciones, self.total_resueltas)
@@ -741,6 +851,8 @@ class PipelineEPP:
         fuente = self._abrir_camara(cv2, indice)
         if not fuente.isOpened():
             raise RuntimeError(f"No se pudo abrir la cámara {indice}")
+        # Sin MJPG, OpenCV pide YUYV y muchas webcams sólo dan 10 fps a 720p en ese formato.
+        fuente.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         fuente.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         fuente.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         logger.info("Cámara %s abierta. Pulsa 'q' para salir.", indice)

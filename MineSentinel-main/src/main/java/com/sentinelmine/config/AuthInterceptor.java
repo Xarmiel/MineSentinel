@@ -30,6 +30,21 @@ public class AuthInterceptor implements HandlerInterceptor {
             return false;
         }
 
+        // ADMIN ve todo; SUPERVISOR (y cualquier rol desconocido) sólo dashboard, cámara e historial.
+        if (!ROL_ADMIN.equals(session.getAttribute("rol")) && !permitidoSupervisor(uri)) {
+            response.sendRedirect("/");
+            return false;
+        }
+
         return true;
+    }
+
+    public static final String ROL_ADMIN = "ADMIN";
+    public static final String ROL_SUPERVISOR = "SUPERVISOR";
+
+    static boolean permitidoSupervisor(String uri) {
+        return uri.equals("/") || uri.equals("/error")
+                || uri.equals("/camara") || uri.startsWith("/camara/")
+                || uri.equals("/historial") || uri.startsWith("/historial/");
     }
 }

@@ -44,6 +44,9 @@ class MovimientoAforoServiceTest {
     @Mock
     private EventoTurnoService eventoTurnoService;
 
+    @Mock
+    private AforoService aforoService;
+
     @InjectMocks
     private MovimientoAforoService movimientoAforoService;
 
@@ -52,7 +55,7 @@ class MovimientoAforoServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(movimientoAforoService, "aforoMaximo", 50);
+        lenient().when(aforoService.getAforoMaximo()).thenReturn(50);
         ReflectionTestUtils.setField(movimientoAforoService, "umbralCriticoPorcentaje", 90);
 
         Turno turno = new Turno("Guardia Día", LocalTime.of(7, 0), LocalTime.of(15, 30));

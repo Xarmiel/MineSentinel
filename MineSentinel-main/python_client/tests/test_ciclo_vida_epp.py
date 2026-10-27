@@ -17,7 +17,10 @@ falta abierta sin aviso. Ninguno de esos fallos lanza excepción.
 
 import os
 import sys
+import threading
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -132,7 +135,7 @@ class TestCierreDeEpisodio(unittest.TestCase):
     def test_resuelve_exactamente_una_vez_al_ponerse_el_epp(self):
         p = _pipeline(frames_abrir=3, frames_cerrar=3)
         self._abrir(p)
-        falta_id = next(iter(p._abiertas.values()))
+        falta_id = next(iter(p._abiertas.values())).result()  # Future del alta
 
         # Los frames_cerrar frames conformes cierran el episodio.
         for _ in range(3):
@@ -215,6 +218,51 @@ class TestFiltradoDeAnomalias(unittest.TestCase):
         suelta = _infraccion(track_id=-1)
         for _ in range(5):
             p._sincronizar_episodios(_analisis(infracciones=[suelta]))
+        self.assertEqual(p._abiertas, {})
+
+
+class TestReportesEnSegundoPlano(unittest.TestCase):
+    """En vivo las altas van a un hilo aparte para no congelar el video."""
+
+    def _con_fondo(self, cliente):
+        p = _pipeline(frames_abrir=1, frames_cerrar=1)
+        p.cliente = cliente
+        p._fondo = ThreadPoolExecutor(max_workers=1)
+        return p
+
+    def test_el_cierre_usa_el_id_de_su_apertura(self):
+        p = self._con_fondo(_ClienteFalso(falta_id_base=555))
+        p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))  # abre
+        p._sincronizar_episodios(_analisis(infracciones=[]))               # cierra
+        p._fondo.shutdown(wait=True)
+        self.assertEqual([r[0] for r in p.cliente.resueltas], [555])
+        self.assertEqual(p._abiertas, {})
+
+    def test_el_bucle_no_espera_a_la_red(self):
+        liberar = threading.Event()
+
+        class _ClienteLento(_ClienteFalso):
+            def enviar_infraccion(self, *a, **kw):
+                liberar.wait(5)
+                return super().enviar_infraccion(*a, **kw)
+
+        p = self._con_fondo(_ClienteLento())
+        inicio = time.monotonic()
+        p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
+        self.assertLess(time.monotonic() - inicio, 0.5)
+        self.assertEqual(len(p._abiertas), 1)  # ya cuenta como abierta: no se duplica
+        liberar.set()
+        p._fondo.shutdown(wait=True)
+        self.assertEqual(len(p.cliente.infracciones_abiertas), 1)
+
+    def test_si_el_alta_falla_se_suelta_la_clave(self):
+        class _ClienteCaido(_ClienteFalso):
+            def enviar_infraccion(self, *a, **kw):
+                return None
+
+        p = self._con_fondo(_ClienteCaido())
+        p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
+        p._fondo.shutdown(wait=True)
         self.assertEqual(p._abiertas, {})
 
 

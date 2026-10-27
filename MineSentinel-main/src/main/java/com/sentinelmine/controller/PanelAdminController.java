@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 public class PanelAdminController {
@@ -58,6 +59,20 @@ public class PanelAdminController {
             return "redirect:/login";
         }
         alertaService.notificarJefeTurno(idAlerta, tipoAlerta);
+        return "redirect:/panel-admin";
+    }
+
+    @PostMapping("/panel-admin/aforo")
+    public String actualizarLimitesAforo(@RequestParam int maximo,
+                                         @RequestParam int minimo,
+                                         RedirectAttributes flash) {
+        // El acceso sólo de administrador lo garantiza AuthInterceptor (/panel-admin/**).
+        try {
+            aforoService.actualizarLimites(maximo, minimo);
+            flash.addFlashAttribute("mensajeAforo", "Límites de aforo actualizados: máximo " + maximo + ", mínimo " + minimo + ".");
+        } catch (IllegalArgumentException e) {
+            flash.addFlashAttribute("errorAforo", e.getMessage());
+        }
         return "redirect:/panel-admin";
     }
 

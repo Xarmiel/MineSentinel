@@ -42,7 +42,7 @@ const modulo = join(dir, 'camara.mjs');
 writeFileSync(modulo,
     coincidencia[1] +
     '\nexport { pintarCuadro, pintarOverlay, limpiarOverlay, escalaCajas,' +
-    ' ordenarPorGravedad, estadoDe };\n', 'utf8');
+    ' ordenarPorGravedad, estadoDe, comprobarSenal };\n', 'utf8');
 
 const llamadas = [];
 
@@ -63,6 +63,9 @@ function crearElemento(id) {
         naturalWidth: 0, naturalHeight: 0,
         style: {}, className: '', textContent: '', innerHTML: '',
         attributes: {}, listeners: {},
+        // Como en el DOM real, la propiedad `src` refleja el atributo.
+        set src(v) { this.attributes.src = String(v); },
+        get src() { return this.attributes.src || ''; },
         context: crearContexto(),
         getContext() { return this.context; },
         getBoundingClientRect() { return this.rect || { width: 0, height: 0 }; },
@@ -94,13 +97,10 @@ globalThis.document = {
     }
 };
 globalThis.window = { devicePixelRatio: 1, addEventListener() { } };
-// Frame válido: el módulo sólo marca hayFrame cuando recibe una imagen real.
-globalThis.fetch = url => String(url).includes('/vision/frame')
-    ? Promise.resolve({
-        status: 200, ok: true,
-        blob: () => Promise.resolve({ size: 8000, type: 'image/jpeg' }),
-        headers: { get: () => 'image/jpeg' }
-    })
+// Stream vigente: el módulo sólo marca hayFrame cuando /estado reporta frames recientes.
+let msStream = 100;
+globalThis.fetch = url => String(url).includes('/vision/estado')
+    ? Promise.resolve({ ok: true, json: () => Promise.resolve({ msDesdeUltimoFrameStream: msStream }) })
     : Promise.resolve({ ok: false });
 globalThis.EventSource = class { addEventListener() { } };
 globalThis.URL = { createObjectURL: () => 'blob:x', revokeObjectURL() { } };
@@ -108,7 +108,7 @@ globalThis.setInterval = () => 0;
 
 const mod = await import(pathToFileURL(modulo).href);
 
-// Deja que pedirFrame() resuelva antes de medir nada.
+// Deja que comprobarSenal() resuelva antes de medir nada.
 await new Promise(r => setTimeout(r, 0));
 await new Promise(r => setTimeout(r, 0));
 
@@ -256,6 +256,21 @@ mod.pintarCuadro({
     personas: [persona({ trackId: 9, caja: null }), persona({ trackId: 10, caja: [1, 2] })]
 });
 comprobar('se ignoran las cajas mal formadas', rects().length === 0, `n=${rects().length}`);
+
+// =============================================================================
+console.log('\nCASO 8 - el video es el stream MJPEG y "sin señal" sale de /estado');
+comprobar('el <img> apunta al MJPEG',
+    /^\/api\/v1\/vision\/stream\.mjpg/.test(elementos.marcoMotor.getAttribute('src') || ''),
+    elementos.marcoMotor.getAttribute('src'));
+msStream = 5000;
+await mod.comprobarSenal();
+comprobar('frames viejos sueltan el stream y muestran el placeholder',
+    elementos.marcoMotor.getAttribute('src') === null &&
+    elementos.placeholderCamara.style.display === 'flex');
+msStream = 100;
+await mod.comprobarSenal();
+comprobar('al volver la señal se reconecta',
+    /stream\.mjpg/.test(elementos.marcoMotor.getAttribute('src') || ''));
 
 // =============================================================================
 console.log('\n' + (fallos.length === 0

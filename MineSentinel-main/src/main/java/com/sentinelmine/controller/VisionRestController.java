@@ -128,7 +128,9 @@ public class VisionRestController {
      * el video viaja de vuelta por el stream MJPEG, no por aquí.
      */
     @PostMapping("/stream")
-    public ResponseEntity<Map<String, Object>> recibirStream(@RequestBody InputStream entrada)
+    // Sin @RequestBody: ningún HttpMessageConverter produce InputStream (415); así Spring
+    // inyecta el cuerpo crudo de la petición y se lee incrementalmente.
+    public ResponseEntity<Map<String, Object>> recibirStream(InputStream entrada)
             throws IOException {
         visionStreamService.recibir(entrada);
         return ResponseEntity.accepted()

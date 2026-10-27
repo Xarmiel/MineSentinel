@@ -167,13 +167,19 @@ public class VisionStreamService {
             }
             visto = secuencia.get();
 
-            salida.write(LIMITE);
-            salida.write(CABECERA);
-            salida.write(Integer.toString(frame.length).getBytes());
-            salida.write(SALTO);
-            salida.write(frame);
-            salida.write("\r\n".getBytes());
-            salida.flush();
+            try {
+                salida.write(LIMITE);
+                salida.write(CABECERA);
+                salida.write(Integer.toString(frame.length).getBytes());
+                salida.write(SALTO);
+                salida.write(frame);
+                salida.write("\r\n".getBytes());
+                salida.flush();
+            } catch (IOException e) {
+                // El navegador cerró /camara: es el final normal del stream, no un error.
+                log.debug("Suscriptor MJPEG desconectado: {}", e.getMessage());
+                return;
+            }
         }
     }
 }

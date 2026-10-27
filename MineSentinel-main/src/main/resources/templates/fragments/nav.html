@@ -12,7 +12,7 @@
     <nav class="topbar-nav">
         <a th:href="@{/}">Dashboard</a>
         <a th:href="@{/camara}">Cámara</a>
-        <a th:href="@{/panel-admin}">Panel Admin</a>
+        <a th:href="@{/panel-admin}" th:if="${session.rol == 'ADMIN'}">Panel Admin</a>
         <a th:href="@{/historial}">Historial</a>
         <a th:href="@{/logout}">Salir</a>
     </nav>

@@ -1,0 +1,115 @@
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+body { background: #f5f4f0; color: #1c1c1c; }
+
+/* LOGIN */
+.login-body { display: flex; align-items: center; justify-content: center; height: 100vh; background: #12151c; }
+.login-card { background: #1a1e27; padding: 2.5rem; border-radius: 12px; width: 340px; color: #e6e6e6; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.brand { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.brand-icon { background: #f6a623; padding: .4rem .6rem; border-radius: 8px; }
+.subtitle { color: #9aa0ab; font-size: .85rem; margin-bottom: 1.5rem; }
+.login-card label { display: block; margin-top: 1rem; font-size: .8rem; color: #9aa0ab; }
+.login-card input { width: 100%; padding: .6rem; margin-top: .3rem; border-radius: 6px; border: 1px solid #2b303b; background: #12151c; color: #fff; }
+.login-card button { width: 100%; margin-top: 1.5rem; padding: .7rem; background: #f6a623; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.error { color: #ef4444; font-size: .8rem; margin-top: .5rem; }
+.hint { margin-top: 1rem; font-size: .75rem; color: #5c6270; text-align: center; }
+
+/* TOPBAR */
+.topbar { display: flex; align-items: center; justify-content: space-between; background: #12151c; color: #fff; padding: .9rem 1.5rem; flex-wrap: wrap; gap: .75rem; }
+.topbar-left { display: flex; align-items: center; gap: .6rem; }
+.subtitle-small { font-size: .65rem; color: #9aa0ab; letter-spacing: .05em; }
+.topbar-nav a { color: #c8cdd6; text-decoration: none; margin-right: 1rem; font-size: .85rem; }
+.topbar-nav a:hover { color: #f6a623; }
+.pill { background: #232834; padding: .3rem .7rem; border-radius: 999px; font-size: .7rem; margin-left: .4rem; }
+.pill-warning { background: #3a2f10; color: #f6a623; }
+.pill-success { background: #123320; color: #22c55e; }
+
+/* LAYOUT */
+.content { padding: 1.5rem; display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.2rem; }
+.content-single { padding: 1.5rem; max-width: 760px; margin: 0 auto; display: block; }
+.camera-card, .aforo-card, .alertas-card, .deteccion-panel { background: #12151c; color: #e6e6e6; border-radius: 12px; padding: 1.2rem; margin-bottom: 1.2rem; }
+.camera-card {
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+    aspect-ratio: 16 / 9;
+}
+.camera-placeholder { height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px dashed #2b303b; border-radius: 10px; color: #9aa0ab; text-align: center; gap: .4rem; }
+.camera-icon { font-size: 1.8rem; }
+.small { font-size: .75rem; color: #7d8390; }
+
+/* CARDS */
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
+.badge { background: #232834; padding: .25rem .6rem; border-radius: 999px; font-size: .7rem; }
+.badge-success { background: #123320; color: #22c55e; }
+
+.aforo-numbers { display: flex; justify-content: space-between; margin-bottom: .8rem; }
+.aforo-numbers div { text-align: center; }
+.num { display: block; font-size: 1.6rem; font-weight: 700; }
+.num-green { color: #22c55e; }
+.aforo-numbers small { color: #7d8390; font-size: .65rem; }
+
+.progress-bar { background: #232834; border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: .4rem; }
+.progress-fill { background: #22c55e; height: 100%; }
+.progress-label { font-size: .7rem; color: #7d8390; margin-bottom: .8rem; }
+.ultimo-evento { font-size: .75rem; color: #9aa0ab; background: #1a1e27; padding: .6rem; border-radius: 8px; }
+
+.alerta { background: #1a1e27; border-left: 3px solid #f6a623; border-radius: 8px; padding: .8rem; margin-bottom: .7rem; }
+.alerta-alta { border-left-color: #ef4444; }
+.alerta-header { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: .3rem; }
+.alerta p { font-size: .8rem; color: #c8cdd6; margin-bottom: .5rem; }
+.hora { color: #7d8390; font-size: .7rem; }
+.alerta-footer { display: flex; gap: .5rem; margin-bottom: .5rem; }
+.tag { background: #232834; font-size: .65rem; padding: .2rem .5rem; border-radius: 6px; }
+.tag-media { background: #3a2f10; color: #f6a623; }
+.tag-alta { background: #3a1414; color: #ef4444; }
+.alerta button { width: 100%; padding: .5rem; border: none; border-radius: 6px; background: #f6a623; font-weight: 600; cursor: pointer; }
+.alerta button:disabled { background: #2b303b; color: #7d8390; cursor: default; }
+
+.deteccion-panel label { display: block; margin-top: .6rem; font-size: .8rem; color: #9aa0ab; }
+.deteccion-panel input { width: 100%; padding: .5rem; margin-top: .3rem; border-radius: 6px; border: 1px solid #2b303b; background: #0f1115; color: #fff; }
+.deteccion-panel button { margin-top: 1rem; padding: .6rem 1rem; background: #f6a623; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.resultado { margin-top: 1rem; padding: .8rem; border-radius: 8px; background: #1a1e27; font-size: .85rem; }
+.resultado-ok { color: #22c55e; }
+.resultado-fail { color: #ef4444; }
+
+.section-title { color: #12151c; margin-bottom: 1rem; }
+.tabla-historial { width: 100%; border-collapse: collapse; background: #12151c; color: #e6e6e6; border-radius: 10px; overflow: hidden; }
+.tabla-historial th, .tabla-historial td { padding: .6rem .8rem; text-align: left; font-size: .8rem; border-bottom: 1px solid #232834; }
+.tabla-historial th { background: #1a1e27; color: #9aa0ab; font-size: .7rem; text-transform: uppercase; }
+
+@media (max-width: 800px) {
+  .content { grid-template-columns: 1fr; }
+}
+.camera-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+}
+.camera-feed {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    object-fit: cover;
+    background: #000;
+}
+.camera-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+.btn-camara {
+    margin-top: .8rem;
+    padding: .5rem 1.2rem;
+    background: #f6a623;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}

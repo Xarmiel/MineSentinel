@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>SentinelMine · Vista de Cámara</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<div th:replace="~{fragments/nav :: nav(${turno})}"></div>
+
+<main class="content-single">
+    <h2 class="section-title">Vista de Cámara</h2>
+
+    <div class="camera-card">
+    <video id="videoCamara" autoplay playsinline class="camera-feed" style="display:none;"></video>
+    <canvas id="overlayCamara" class="camera-overlay"></canvas>
+    <div class="camera-placeholder" id="placeholderCamara">
+        <span class="camera-icon">📷</span>
+        <p>Conexión a cámara de seguridad</p>
+        <button type="button" id="btnActivarCamara" class="btn-camara">Activar cámara</button>
+    </div>
+</div>
+    <p id="estadoDeteccion" class="small">Estado: sin iniciar</p>
+
+    <div class="deteccion-panel">
+        <h3>Identificación de EPP mediante YOLOv8</h3>
+        <p class="small">Este formulario simula el resultado de la inferencia del modelo sobre un frame capturado
+            (en producción, el modelo corre sobre el stream de video real).</p>
+        <form method="post" th:action="@{/camara/simular}">
+            <label>Código de trabajador</label>
+            <input type="text" name="codigoTrabajador" placeholder="16" required>
+            <button type="submit">Simular detección</button>
+        </form>
+
+        <div class="resultado" th:if="${resultado != null}">
+            <p th:if="${resultado.eppCompleto}" class="resultado-ok">
+                ✅ Trabajador #<span th:text="${resultado.trabajadorCodigo}"></span>: EPP completo. Ingreso autorizado.
+            </p>
+            <p th:unless="${resultado.eppCompleto}" class="resultado-fail">
+                ⚠️ Trabajador #<span th:text="${resultado.trabajadorCodigo}"></span>: falta
+                <span th:text="${resultado.elementoFaltante}"></span>. Ingreso bloqueado y alerta registrada.
+            </p>
+        </div>
+    </div>
+</main>
+</body>
+<script type="module">
+    import { FilesetResolver, FaceDetector, HandLandmarker, DrawingUtils }
+        from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+    const btnActivarCamara = document.getElementById('btnActivarCamara');
+    const videoCamara = document.getElementById('videoCamara');
+    const placeholderCamara = document.getElementById('placeholderCamara');
+    const overlay = document.getElementById('overlayCamara');
+    const ctx = overlay.getContext('2d');
+    const drawingUtils = new DrawingUtils(ctx);
+    const estadoDeteccion = document.getElementById('estadoDeteccion');
+
+    function setEstado(msg) {
+        console.log('[deteccion]', msg);
+        if (estadoDeteccion) estadoDeteccion.textContent = 'Estado: ' + msg;
+    }
+
+    let faceDetector, handLandmarker;
+    let detectando = false;
+
+    async function cargarModelos() {
+        setEstado('descargando librería de MediaPipe...');
+        const vision = await FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+        );
+
+        setEstado('descargando modelo de rostro...');
+        faceDetector = await FaceDetector.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
+            },
+            runningMode: "VIDEO"
+        });
+
+        setEstado('descargando modelo de manos...');
+        handLandmarker = await HandLandmarker.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+            },
+            runningMode: "VIDEO",
+            numHands: 2
+        });
+
+        setEstado('modelos cargados, detectando...');
+    }
+
+    function dibujarCuadro(x, y, w, h, color) {
+        ctx.strokeStyle = color || "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+    }
+
+    // Dibuja el esqueleto completo de una mano (21 puntos + conexiones),
+    // igual que en el ejemplo de referencia: líneas verdes entre articulaciones
+    // y puntos magenta sobre cada landmark.
+    function dibujarEsqueletoMano(puntos) {
+        drawingUtils.drawConnectors(puntos, HandLandmarker.HAND_CONNECTIONS, {
+            color: "#39FF88",
+            lineWidth: 2
+        });
+        drawingUtils.drawLandmarks(puntos, {
+            color: "#FF2FB0",
+            fillColor: "#FF2FB0",
+            radius: 4
+        });
+    }
+
+    // FaceDetector solo entrega 6 keypoints (ojos, nariz, boca, orejas),
+    // no una malla completa. Los dibujamos para que la cara también
+    // muestre puntos de referencia, no solo el recuadro.
+    function dibujarKeypointsRostro(keypoints, width, height) {
+        if (!keypoints) return;
+        keypoints.forEach(kp => {
+            ctx.beginPath();
+            ctx.arc(kp.x * width, kp.y * height, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = "#00E5FF";
+            ctx.fill();
+        });
+    }
+
+    function loopDeteccion() {
+        if (!detectando) return;
+
+        if (videoCamara.readyState < 2) {
+            requestAnimationFrame(loopDeteccion);
+            return;
+        }
+
+        overlay.width = videoCamara.videoWidth;
+        overlay.height = videoCamara.videoHeight;
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+        const timestamp = performance.now();
+
+        const resultadoRostro = faceDetector.detectForVideo(videoCamara, timestamp);
+        resultadoRostro.detections.forEach(d => {
+            const box = d.boundingBox;
+            dibujarCuadro(box.originX, box.originY, box.width, box.height, "#00E5FF");
+            dibujarKeypointsRostro(d.keypoints, overlay.width, overlay.height);
+        });
+
+        const resultadoManos = handLandmarker.detectForVideo(videoCamara, timestamp);
+        resultadoManos.landmarks.forEach(puntos => {
+            dibujarEsqueletoMano(puntos);
+
+            const xs = puntos.map(p => p.x * overlay.width);
+            const ys = puntos.map(p => p.y * overlay.height);
+            const minX = Math.min(...xs), maxX = Math.max(...xs);
+            const minY = Math.min(...ys), maxY = Math.max(...ys);
+            dibujarCuadro(minX - 10, minY - 10, (maxX - minX) + 20, (maxY - minY) + 20, "#39FF88");
+        });
+
+        setEstado('rostros: ' + resultadoRostro.detections.length + ' | manos: ' + resultadoManos.landmarks.length);
+
+        requestAnimationFrame(loopDeteccion);
+    }
+
+    if (btnActivarCamara) {
+        btnActivarCamara.addEventListener('click', async () => {
+            if (videoCamara.srcObject) return; // ya está activa
+            try {
+                setEstado('pidiendo permiso de cámara...');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { aspectRatio: { ideal: 16 / 9 } }, audio: false });
+                videoCamara.srcObject = stream;
+                videoCamara.style.display = 'block';
+                placeholderCamara.style.display = 'none';
+                setEstado('cámara activa, cargando modelos...');
+
+                await cargarModelos();
+
+                detectando = true;
+                loopDeteccion();
+            } catch (err) {
+                setEstado('ERROR: ' + err.message);
+                alert('No se pudo acceder a la cámara o cargar el modelo: ' + err.message);
+                console.error(err);
+            }
+        });
+    }
+</script>
+</html>

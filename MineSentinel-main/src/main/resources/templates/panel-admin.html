@@ -25,6 +25,20 @@
             <div id="progressFill" class="progress-fill" th:style="'width:' + ${aforo.porcentaje} + '%'"></div>
         </div>
         <p class="ultimo-evento">Último cruce de línea virtual<br><span id="ultimoEvento" th:text="${aforo.ultimoEvento}"></span></p>
+
+        <form method="post" th:action="@{/panel-admin/aforo}" class="filtros-historial">
+            <div class="filtro-campo">
+                <label for="aforoMaximoInput">Máximo permitido</label>
+                <input id="aforoMaximoInput" type="number" name="maximo" min="1" required th:value="${aforo.maximo}">
+            </div>
+            <div class="filtro-campo">
+                <label for="aforoMinimoInput">Mínimo</label>
+                <input id="aforoMinimoInput" type="number" name="minimo" min="0" required th:value="${aforo.minimo}">
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar límites</button>
+        </form>
+        <p class="error" th:if="${errorAforo}" th:text="${errorAforo}"></p>
+        <p class="small txt-conforme" th:if="${mensajeAforo}" th:text="${mensajeAforo}"></p>
     </section>
 
     <section class="deteccion-panel">

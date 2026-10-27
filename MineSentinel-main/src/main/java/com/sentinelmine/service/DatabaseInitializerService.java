@@ -1,5 +1,6 @@
 package com.sentinelmine.service;
 
+import com.sentinelmine.config.AuthInterceptor;
 import com.sentinelmine.entity.*;
 import com.sentinelmine.entity.enums.EstadoAlerta;
 import com.sentinelmine.entity.enums.EstadoTurno;
@@ -67,6 +68,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
         try {
             log.info("Verificando catálogos y estado inicial en base de datos...");
             inicializarUsuarios();
+            inicializarSupervisor();
             inicializarRoles();
             inicializarTurnos();
             inicializarCatalogoEPP();
@@ -99,6 +101,26 @@ public class DatabaseInitializerService implements CommandLineRunner {
                 usuarioRepository.save(admin);
                 log.info("Credenciales del usuario 'admin' actualizadas a 'sentinel123'.");
             }
+            // AuthInterceptor sólo da acceso total al rol ADMIN exacto.
+            if (!AuthInterceptor.ROL_ADMIN.equals(admin.getRol())) {
+                admin.setRol(AuthInterceptor.ROL_ADMIN);
+                usuarioRepository.save(admin);
+                log.info("Rol del usuario 'admin' normalizado a ADMIN.");
+            }
+        }
+    }
+
+    private void inicializarSupervisor() {
+        // Sólo se crea si no existe: no se pisa una contraseña que el equipo ya haya cambiado.
+        if (usuarioRepository.findByUsername("supervisor").isEmpty()) {
+            usuarioRepository.save(new Usuario(
+                    "supervisor",
+                    passwordEncoder.encode("supervisor123"),
+                    "Supervisor de Turno",
+                    AuthInterceptor.ROL_SUPERVISOR,
+                    true
+            ));
+            log.info("Usuario supervisor por defecto 'supervisor' creado exitosamente.");
         }
     }
 

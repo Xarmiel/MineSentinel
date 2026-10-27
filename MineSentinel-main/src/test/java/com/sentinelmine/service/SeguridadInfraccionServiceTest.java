@@ -196,7 +196,7 @@ class SeguridadInfraccionServiceTest {
         InfraccionResolucionRequestDTO dto = new InfraccionResolucionRequestDTO(
                 110L, 7, "EPP repuesto: Casco de Seguridad", "/evidencias/cumple_7.jpg");
 
-        when(faltaEPPRepository.findById(110L)).thenReturn(Optional.of(falta));
+        when(faltaEPPRepository.findByIdWithDetails(110L)).thenReturn(Optional.of(falta));
         when(faltaEPPRepository.save(any(FaltaEPP.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         FaltaEPP resultado = seguridadInfraccionService.resolverFaltaEPP(dto);
@@ -214,7 +214,7 @@ class SeguridadInfraccionServiceTest {
                 EstadoAlerta.RESUELTA, LocalDateTime.now(), 7, TipoInfraccionEPP.FALTANTE, "Sin Casco");
         falta.setFaltaId(111L);
 
-        when(faltaEPPRepository.findById(111L)).thenReturn(Optional.of(falta));
+        when(faltaEPPRepository.findByIdWithDetails(111L)).thenReturn(Optional.of(falta));
 
         FaltaEPP resultado = seguridadInfraccionService.resolverFaltaEPP(
                 new InfraccionResolucionRequestDTO(111L, 7, null, null));
@@ -227,7 +227,7 @@ class SeguridadInfraccionServiceTest {
     @Test
     @DisplayName("Debe lanzar error al resolver una falta inexistente")
     void testResolverFaltaEPPInexistente() {
-        when(faltaEPPRepository.findById(999L)).thenReturn(Optional.empty());
+        when(faltaEPPRepository.findByIdWithDetails(999L)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
                 seguridadInfraccionService.resolverFaltaEPP(

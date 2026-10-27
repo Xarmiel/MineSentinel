@@ -34,9 +34,8 @@ public class MovimientoAforoService {
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
     private final SseNotificationService sseNotificationService;
-
-    @Value("${minesentinel.aforo.maximo:50}")
-    private int aforoMaximo;
+    // Fuente única del máximo: el administrador lo cambia en caliente desde el panel.
+    private final AforoService aforoService;
 
     @Value("${minesentinel.aforo.umbral-critico:90}")
     private int umbralCriticoPorcentaje;
@@ -45,12 +44,14 @@ public class MovimientoAforoService {
                                   EventoTurnoRepository eventoTurnoRepository,
                                   RolPersonalRepository rolPersonalRepository,
                                   EventoTurnoService eventoTurnoService,
-                                  SseNotificationService sseNotificationService) {
+                                  SseNotificationService sseNotificationService,
+                                  AforoService aforoService) {
         this.movimientoAforoRepository = movimientoAforoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
         this.sseNotificationService = sseNotificationService;
+        this.aforoService = aforoService;
     }
 
     /**
@@ -104,6 +105,7 @@ public class MovimientoAforoService {
         List<EventoTurno> turnosActivos = eventoTurnoRepository.findByEstado(EstadoTurno.ACTIVO);
         int cantidadTurnosActivos = turnosActivos.size();
 
+        int aforoMaximo = aforoService.getAforoMaximo();
         int porcentaje = (int) Math.round((aforoActual * 100.0) / aforoMaximo);
 
         String estadoAforo;
