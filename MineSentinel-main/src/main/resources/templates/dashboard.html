@@ -33,6 +33,23 @@
         </article>
     </section>
 
+    <section class="kpi-strip kpi-strip-turno">
+        <article class="kpi-card">
+            <span class="kpi-label">Cumplimiento EPP · Turno</span>
+            <span class="kpi-value" id="kpiCumplimientoTurno">—</span>
+            <small class="kpi-detalle" id="kpiCumplimientoTurnoDetalle"></small>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">Infracciones EPP · Turno</span>
+            <span class="kpi-value" id="kpiInfraccionesTurno">—</span>
+        </article>
+        <article class="kpi-card">
+            <span class="kpi-label">EPP más incumplido · Turno</span>
+            <span class="kpi-value kpi-texto" id="kpiEppMasIncumplido">—</span>
+            <small class="kpi-detalle" id="kpiEppMasIncumplidoDetalle"></small>
+        </article>
+    </section>
+
     <div class="dashboard-grid">
         <section class="aforo-card">
             <div class="card-header">
@@ -182,7 +199,29 @@
         }).join('');
     }
 
+    async function cargarKpisTurno() {
+        try {
+            const res = await fetch('/api/v1/seguridad/kpis/turno-actual');
+            if (!res.ok) return;
+            const k = await res.json();
+            const elCumpl = document.getElementById('kpiCumplimientoTurno');
+            elCumpl.textContent = k.cumplimientoPorcentaje + '%';
+            elCumpl.className = 'kpi-value ' + (k.cumplimientoPorcentaje >= 90 ? 'kpi-ok' : (k.cumplimientoPorcentaje >= 70 ? 'kpi-warn' : 'kpi-danger'));
+            document.getElementById('kpiCumplimientoTurnoDetalle').textContent =
+                k.personasConFalta + ' de ' + k.personasDetectadas + ' personas con falta';
+            const elInfr = document.getElementById('kpiInfraccionesTurno');
+            elInfr.textContent = k.infracciones;
+            elInfr.className = 'kpi-value ' + (k.infracciones > 0 ? 'kpi-danger' : 'kpi-ok');
+            document.getElementById('kpiEppMasIncumplido').textContent = k.eppMasIncumplido || 'Ninguno';
+            document.getElementById('kpiEppMasIncumplidoDetalle').textContent =
+                k.eppMasIncumplido ? k.eppMasIncumplidoConteo + ' infracciones' : '';
+        } catch (e) {
+            console.error('No se pudieron cargar los KPIs del turno:', e);
+        }
+    }
+
     async function refrescarDashboard() {
+        cargarKpisTurno();
         try {
             const resAforo = await fetch('/api/v1/aforo/dashboard');
             if (resAforo.ok) {

@@ -464,6 +464,10 @@ body {
     line-height: 1.1;
 }
 
+.kpi-strip-turno { grid-template-columns: repeat(3, 1fr); }
+.kpi-texto { font-size: 1.15rem; overflow-wrap: anywhere; }
+.kpi-detalle { font-size: .72rem; color: var(--text-muted); }
+
 .kpi-ok { color: var(--success-strong); }
 .kpi-warn { color: var(--warning-strong); }
 .kpi-danger { color: var(--danger-strong); }

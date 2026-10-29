@@ -57,6 +57,9 @@ class SeguridadInfraccionServiceTest {
     @Mock
     private SseNotificationService sseNotificationService;
 
+    @Mock
+    private MovimientoAforoRepository movimientoAforoRepository;
+
     @InjectMocks
     private SeguridadInfraccionService seguridadInfraccionService;
 
@@ -324,5 +327,39 @@ class SeguridadInfraccionServiceTest {
         assertEquals(1, resultado.size());
         assertEquals(TipoInfraccionEPP.IMPOSTOR, resultado.get(0).getTipoInfraccion());
         verify(faltaEPPRepository, times(1)).findByTipoInfraccion(any(Pageable.class), eq(TipoInfraccionEPP.IMPOSTOR));
+    }
+
+    @Test
+    @DisplayName("KPIs del turno: cumplimiento cuenta personas con falta sin entrada y toma el EPP más incumplido")
+    void obtenerKpisTurnoActivo_calculaCumplimientoYEppMasIncumplido() {
+        // 4 entradas (1..4); faltas en 2 y en 5 (detectado sin cruzar la línea) -> 2 de 5 con falta = 60%
+        when(movimientoAforoRepository.trackIdsConEntradaTurnoActivo()).thenReturn(List.of(1, 2, 3, 4));
+        when(faltaEPPRepository.trackIdsConFaltaTurnoActivo()).thenReturn(List.of(2, 5));
+        when(faltaEPPRepository.contarInfraccionesTurnoActivo()).thenReturn(7L);
+        when(faltaEPPRepository.contarInfraccionesPorEppTurnoActivo())
+                .thenReturn(List.of(new Object[]{"Casco", 5L}, new Object[]{"Guantes", 2L}));
+
+        var kpis = seguridadInfraccionService.obtenerKpisTurnoActivo();
+
+        assertEquals(60, kpis.get("cumplimientoPorcentaje"));
+        assertEquals(5, kpis.get("personasDetectadas"));
+        assertEquals(2, kpis.get("personasConFalta"));
+        assertEquals(7L, kpis.get("infracciones"));
+        assertEquals("Casco", kpis.get("eppMasIncumplido"));
+        assertEquals(5L, kpis.get("eppMasIncumplidoConteo"));
+    }
+
+    @Test
+    @DisplayName("KPIs del turno: sin personas detectadas el cumplimiento es 100% y no hay EPP más incumplido")
+    void obtenerKpisTurnoActivo_sinDatos() {
+        when(movimientoAforoRepository.trackIdsConEntradaTurnoActivo()).thenReturn(List.of());
+        when(faltaEPPRepository.trackIdsConFaltaTurnoActivo()).thenReturn(List.of());
+        when(faltaEPPRepository.contarInfraccionesPorEppTurnoActivo()).thenReturn(List.of());
+
+        var kpis = seguridadInfraccionService.obtenerKpisTurnoActivo();
+
+        assertEquals(100, kpis.get("cumplimientoPorcentaje"));
+        assertNull(kpis.get("eppMasIncumplido"));
+        assertEquals(0L, kpis.get("eppMasIncumplidoConteo"));
     }
 }

@@ -52,4 +52,22 @@ public interface FaltaEPPRepository extends JpaRepository<FaltaEPP, Long> {
            "WHERE f.estadoAlerta = :estado " +
            "ORDER BY f.fechaHora DESC")
     List<FaltaEPP> findByEstadoWithDetails(@Param("estado") EstadoAlerta estado);
+
+    // KPIs del turno: se excluyen las DESCARTADA porque son falsos positivos del modelo.
+    @Query("SELECT COUNT(f) FROM FaltaEPP f " +
+           "WHERE f.eventoTurno.estado = com.sentinelmine.entity.enums.EstadoTurno.ACTIVO " +
+           "AND f.estadoAlerta <> com.sentinelmine.entity.enums.EstadoAlerta.DESCARTADA")
+    long contarInfraccionesTurnoActivo();
+
+    @Query("SELECT f.epp.nombre, COUNT(f) FROM FaltaEPP f " +
+           "WHERE f.eventoTurno.estado = com.sentinelmine.entity.enums.EstadoTurno.ACTIVO " +
+           "AND f.estadoAlerta <> com.sentinelmine.entity.enums.EstadoAlerta.DESCARTADA " +
+           "GROUP BY f.epp.nombre ORDER BY COUNT(f) DESC")
+    List<Object[]> contarInfraccionesPorEppTurnoActivo();
+
+    @Query("SELECT DISTINCT f.trackId FROM FaltaEPP f " +
+           "WHERE f.eventoTurno.estado = com.sentinelmine.entity.enums.EstadoTurno.ACTIVO " +
+           "AND f.estadoAlerta <> com.sentinelmine.entity.enums.EstadoAlerta.DESCARTADA " +
+           "AND f.trackId IS NOT NULL")
+    List<Integer> trackIdsConFaltaTurnoActivo();
 }

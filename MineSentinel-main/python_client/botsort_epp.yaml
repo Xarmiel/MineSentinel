@@ -1,0 +1,24 @@
+tracker_type: botsort
+# Mismos umbrales que bytetrack_epp.yaml para que solo cambie la re-identificación.
+track_high_thresh: 0.5
+track_low_thresh: 0.1
+new_track_thresh: 0.6
+# Frames que un track perdido sigue vivo para poder recuperarlo (~8 s a 20 fps).
+# En ByteTrack eran 30 (~1.5 s): quien salía de cuadro volvía con un ID nuevo.
+track_buffer: 150
+match_thresh: 0.8
+fuse_score: true
+# null = rastrear TODAS las clases, no solo la clase 0.
+# Necesario porque en los modelos de EPP la clase persona no es la clase 0
+# y el EPP (casco, chaleco...) debe llegar también al módulo de reglas.
+classes: null
+
+# Cámara fija: la compensación de movimiento solo gastaría CPU.
+gmc_method: none
+
+# Re-identificación por apariencia: recupera el ID de un track perdido si la
+# persona se parece lo suficiente y reaparece cerca de donde se perdió.
+with_reid: true
+model: auto            # usa las features del propio detector YOLO, sin modelo extra
+proximity_thresh: 0.5
+appearance_thresh: 0.8

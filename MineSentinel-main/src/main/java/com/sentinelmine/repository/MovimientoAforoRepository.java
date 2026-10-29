@@ -70,4 +70,13 @@ public interface MovimientoAforoRepository extends JpaRepository<MovimientoAforo
            "JOIN FETCH e.turno " +
            "ORDER BY m.fechaHora DESC")
     List<MovimientoAforo> findUltimosMovimientos(Pageable pageable);
+
+    /**
+     * Personas (trackId) que ingresaron durante los turnos activos; base de la tasa de cumplimiento EPP.
+     */
+    @Query("SELECT DISTINCT m.trackId FROM MovimientoAforo m " +
+           "WHERE m.eventoTurno.estado = com.sentinelmine.entity.enums.EstadoTurno.ACTIVO " +
+           "AND m.tipoMovimiento = com.sentinelmine.entity.enums.TipoMovimiento.ENTRADA " +
+           "AND m.trackId IS NOT NULL")
+    List<Integer> trackIdsConEntradaTurnoActivo();
 }

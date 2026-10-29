@@ -260,7 +260,7 @@ class DetectorEPP:
         self._track_counter = 0
         self._ultimas_dimensiones: Optional[Tuple[int, int]] = None
         self._tracker_path = os.path.join(
-            os.path.dirname(os.path.abspath(config_path)), "bytetrack_epp.yaml"
+            os.path.dirname(os.path.abspath(config_path)), "botsort_epp.yaml"
         )
         self._contador_fotogramas = 0
 

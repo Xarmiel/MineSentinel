@@ -245,10 +245,12 @@ emision:
   # de admin refleje al instante quién se quitó y quién se volvió a poner el EPP.
   #
   # Frames consecutivos con falta antes de ABRIR el episodio. Filtra el
-  # parpadeo de un solo frame (asociación EPP↔persona inestable).
-  frames_abrir: 3
-  # Frames consecutivos sin falta antes de CERRAR (resolver) el episodio. Mayor
-  # que frames_abrir a propósito: cerrar y reabrir cada frame generaría ruido.
+  # parpadeo del modelo: con 3 (0.15 s a 20 fps) las gafas, que el modelo
+  # pierde al girar la cabeza, generaban decenas de faltas que se resolvían
+  # solas. 25 frames ≈ 1.2 s de ausencia sostenida.
+  frames_abrir: 25
+  # Frames consecutivos sin falta antes de CERRAR (resolver) el episodio.
+  # Reabrir exige otros frames_abrir, así que cerrar rápido no genera ruido.
   frames_cerrar: 8
 
 # =============================================================================

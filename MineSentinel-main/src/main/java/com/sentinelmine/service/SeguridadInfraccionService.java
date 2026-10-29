@@ -15,7 +15,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Servicio encargado de la ingestión y gestión de alertas de seguridad industrial
@@ -35,6 +39,7 @@ public class SeguridadInfraccionService {
     private final EventoTurnoService eventoTurnoService;
     private final SseNotificationService sseNotificationService;
     private final NotificacionExternaService notificacionExternaService;
+    private final MovimientoAforoRepository movimientoAforoRepository;
 
     public SeguridadInfraccionService(FaltaEPPRepository faltaEPPRepository,
                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository,
@@ -44,7 +49,8 @@ public class SeguridadInfraccionService {
                                      RolPersonalRepository rolPersonalRepository,
                                      EventoTurnoService eventoTurnoService,
                                      SseNotificationService sseNotificationService,
-                                     NotificacionExternaService notificacionExternaService) {
+                                     NotificacionExternaService notificacionExternaService,
+                                     MovimientoAforoRepository movimientoAforoRepository) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
@@ -54,6 +60,7 @@ public class SeguridadInfraccionService {
         this.eventoTurnoService = eventoTurnoService;
         this.sseNotificationService = sseNotificationService;
         this.notificacionExternaService = notificacionExternaService;
+        this.movimientoAforoRepository = movimientoAforoRepository;
     }
 
     /**
@@ -244,5 +251,34 @@ public class SeguridadInfraccionService {
     @Transactional(readOnly = true)
     public List<AnomaliaMovimiento> obtenerUltimasAnomalias(int limit) {
         return anomaliaMovimientoRepository.findUltimasAnomalias(PageRequest.of(0, limit));
+    }
+
+    /**
+     * KPIs EPP de los turnos activos: tasa de cumplimiento, total de infracciones
+     * y el EPP más incumplido. Las DESCARTADA no cuentan (falsos positivos).
+     *
+     * Cumplimiento = 1 - (personas con falta / personas detectadas), donde las
+     * detectadas son los trackId que ingresaron más los que tuvieron falta sin
+     * cruzar la línea, para que la tasa nunca baje de 0%.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> obtenerKpisTurnoActivo() {
+        // shortcut: trackId identifica a la persona solo mientras ByteTrack no se reinicie; si el cliente Python se reinicia a mitad de turno, los IDs pueden repetirse.
+        Set<Integer> conFalta = new HashSet<>(faltaEPPRepository.trackIdsConFaltaTurnoActivo());
+        Set<Integer> detectadas = new HashSet<>(movimientoAforoRepository.trackIdsConEntradaTurnoActivo());
+        detectadas.addAll(conFalta);
+        int cumplimiento = detectadas.isEmpty() ? 100
+                : (int) Math.round(100.0 * (detectadas.size() - conFalta.size()) / detectadas.size());
+
+        List<Object[]> porEpp = faltaEPPRepository.contarInfraccionesPorEppTurnoActivo();
+
+        Map<String, Object> kpis = new LinkedHashMap<>();
+        kpis.put("cumplimientoPorcentaje", cumplimiento);
+        kpis.put("personasDetectadas", detectadas.size());
+        kpis.put("personasConFalta", conFalta.size());
+        kpis.put("infracciones", faltaEPPRepository.contarInfraccionesTurnoActivo());
+        kpis.put("eppMasIncumplido", porEpp.isEmpty() ? null : porEpp.get(0)[0]);
+        kpis.put("eppMasIncumplidoConteo", porEpp.isEmpty() ? 0L : porEpp.get(0)[1]);
+        return kpis;
     }
 }

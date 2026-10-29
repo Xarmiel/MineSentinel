@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controlador REST para la integración con los módulos de visión por computador (YOLOv8 + ByteTrack)
@@ -170,6 +171,11 @@ public class AforoRestController {
     @GetMapping("/aforo/dashboard")
     public ResponseEntity<AforoDTO> obtenerResumenDashboard() {
         return ResponseEntity.ok(aforoService.toDTO());
+    }
+
+    @GetMapping("/seguridad/kpis/turno-actual")
+    public ResponseEntity<Map<String, Object>> obtenerKpisTurnoActual() {
+        return ResponseEntity.ok(seguridadInfraccionService.obtenerKpisTurnoActivo());
     }
 
     @GetMapping("/alertas/recientes")
