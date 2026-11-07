@@ -9,6 +9,7 @@ import com.sentinelmine.entity.enums.TipoMovimiento;
 import com.sentinelmine.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Inicializador de datos de catálogo y estado inicial en Supabase/PostgreSQL.
- * Garantiza que la aplicación arranque con datos válidos de turnos, EPP, anomalías, roles y usuarios.
- */
 @Service
 public class DatabaseInitializerService implements CommandLineRunner {
 
@@ -39,6 +36,12 @@ public class DatabaseInitializerService implements CommandLineRunner {
     private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+
+    // Vacías = no se fuerzan; así un arranque local no pisa la contraseña de producción (misma BD).
+    @Value("${minesentinel.admin.password:}")
+    private String adminPassword = "";
+    @Value("${minesentinel.supervisor.password:}")
+    private String supervisorPassword = "";
 
     public DatabaseInitializerService(RolPersonalRepository rolPersonalRepository,
                                       TurnoRepository turnoRepository,
@@ -85,7 +88,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
         if (adminOpt.isEmpty()) {
             Usuario admin = new Usuario(
                     "admin",
-                    passwordEncoder.encode("sentinel123"),
+                    passwordEncoder.encode(adminPassword.isEmpty() ? "sentinel123" : adminPassword),
                     "Administrador del Sistema",
                     "ADMIN",
                     true
@@ -94,14 +97,17 @@ public class DatabaseInitializerService implements CommandLineRunner {
             log.info("Usuario administrador por defecto 'admin' creado exitosamente.");
         } else {
             Usuario admin = adminOpt.get();
-            if (admin.getEstadoActivo() == null || !admin.getEstadoActivo() || !passwordEncoder.matches("sentinel123", admin.getPassword())) {
-                admin.setPassword(passwordEncoder.encode("sentinel123"));
+            if (admin.getEstadoActivo() == null || !admin.getEstadoActivo()) {
                 admin.setEstadoActivo(true);
                 admin.setNombreCompleto("Administrador del Sistema");
                 usuarioRepository.save(admin);
-                log.info("Credenciales del usuario 'admin' actualizadas a 'sentinel123'.");
+                log.info("Usuario 'admin' reactivado.");
             }
-            // AuthInterceptor sólo da acceso total al rol ADMIN exacto.
+            if (!adminPassword.isEmpty() && !passwordEncoder.matches(adminPassword, admin.getPassword())) {
+                admin.setPassword(passwordEncoder.encode(adminPassword));
+                usuarioRepository.save(admin);
+                log.info("Contraseña del usuario 'admin' sincronizada con ADMIN_PASSWORD.");
+            }
             if (!AuthInterceptor.ROL_ADMIN.equals(admin.getRol())) {
                 admin.setRol(AuthInterceptor.ROL_ADMIN);
                 usuarioRepository.save(admin);
@@ -111,16 +117,20 @@ public class DatabaseInitializerService implements CommandLineRunner {
     }
 
     private void inicializarSupervisor() {
-        // Sólo se crea si no existe: no se pisa una contraseña que el equipo ya haya cambiado.
-        if (usuarioRepository.findByUsername("supervisor").isEmpty()) {
+        Optional<Usuario> supOpt = usuarioRepository.findByUsername("supervisor");
+        if (supOpt.isEmpty()) {
             usuarioRepository.save(new Usuario(
                     "supervisor",
-                    passwordEncoder.encode("supervisor123"),
+                    passwordEncoder.encode(supervisorPassword.isEmpty() ? "supervisor123" : supervisorPassword),
                     "Supervisor de Turno",
                     AuthInterceptor.ROL_SUPERVISOR,
                     true
             ));
             log.info("Usuario supervisor por defecto 'supervisor' creado exitosamente.");
+        } else if (!supervisorPassword.isEmpty() && !passwordEncoder.matches(supervisorPassword, supOpt.get().getPassword())) {
+            supOpt.get().setPassword(passwordEncoder.encode(supervisorPassword));
+            usuarioRepository.save(supOpt.get());
+            log.info("Contraseña del usuario 'supervisor' sincronizada con SUPERVISOR_PASSWORD.");
         }
     }
 
@@ -166,7 +176,6 @@ public class DatabaseInitializerService implements CommandLineRunner {
                     nuevos.stream().map(c -> c.getNombre() + " [" + c.getTipo() + "]").toList());
         }
 
-        // Backfill: filas heredadas de instalaciones previas al campo 'tipo'
         List<CatalogoEPP> porCorregir = catalogoEPPRepository.findAll().stream()
                 .filter(c -> c.getTipo() == null)
                 .toList();
@@ -187,7 +196,6 @@ public class DatabaseInitializerService implements CommandLineRunner {
                 new CatalogoEPP("Gafas de Seguridad / Protectoras", TipoCatalogoEPP.CONFORME),
                 new CatalogoEPP("Guantes de Seguridad", TipoCatalogoEPP.CONFORME),
                 new CatalogoEPP("Mascarilla / Respirador contra Polvo", TipoCatalogoEPP.CONFORME),
-                // Objetos NO homologados que se hacen pasar por EPP homologado
                 new CatalogoEPP("Gorra / Sombrero No Apto como Casco", TipoCatalogoEPP.IMPOSTOR),
                 new CatalogoEPP("Gafas de Sol No Aptas como Gafas de Seguridad", TipoCatalogoEPP.IMPOSTOR),
                 new CatalogoEPP("Calzado Normal / Zapatillas Deportivas", TipoCatalogoEPP.IMPOSTOR)
@@ -218,9 +226,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
                 RolPersonal rolPerforista = rolPersonalRepository.findAll().stream().findFirst().orElse(null);
                 CatalogoEPP eppCasco = catalogoEPPRepository.findAll().stream().findFirst().orElse(null);
 
-                // Aforo inicial en 0 (sin sembrar movimientos artificiales de aforo)
 
-                // Sembrar alerta inicial de demostración
                 if (eppCasco != null) {
                     faltaEPPRepository.save(new FaltaEPP(
                             eventoGuardado,

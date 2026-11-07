@@ -2,11 +2,6 @@ package com.sentinelmine.dto;
 
 import java.time.LocalDate;
 
-/**
- * Filtros de consulta del historial de alertas. Se aplican en la base de datos
- * (no en el navegador), de modo que la búsqueda cubre todo el histórico y no
- * solo las filas que ya fueron enviadas a la vista.
- */
 public class HistorialFiltro {
 
     public static final int PAGE_SIZE_DEFAULT = 25;

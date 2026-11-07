@@ -3,10 +3,6 @@ package com.sentinelmine.entity;
 import jakarta.persistence.*;
 import java.util.Objects;
 
-/**
- * 1. RolesPersonal: Catálogo de roles operativos en mina (e.g. Perforista, Supervisor, Geólogo, Visitante).
- * Relaciona el color de casco reglamentario y si su presencia suma a la capacidad máxima de socavón.
- */
 @Entity
 @Table(name = "roles_personal")
 public class RolPersonal {

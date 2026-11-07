@@ -4,11 +4,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * 9. CierresAuditoriaTurno: Resumen consolidado y balance de personal al finalizar un evento de turno.
- * Permite conciliar que todas las personas que ingresaron en la guardia hayan registrado su salida,
- * o identificar discrepancias de personal que aún permanece dentro de la mina.
- */
 @Entity
 @Table(name = "cierres_auditoria_turno", indexes = {
     @Index(name = "idx_cierres_auditoria_evento", columnList = "evento_id", unique = true)

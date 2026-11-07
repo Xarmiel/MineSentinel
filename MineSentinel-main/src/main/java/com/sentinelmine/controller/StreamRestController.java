@@ -8,9 +8,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-/**
- * Controlador REST para el streaming de eventos en tiempo real hacia los navegadores web (Server-Sent Events).
- */
 @RestController
 @RequestMapping("/api/v1/stream")
 @CrossOrigin(origins = "*")

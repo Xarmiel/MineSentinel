@@ -5,11 +5,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * 5. EventosTurno: Instancias operativas reales de un turno en una fecha/hora determinada.
- * IMPORTANTE: Soporta múltiples registros con estado 'ACTIVO' en paralelo para permitir
- * el solapamiento de turnos (shift overlap) durante el relevo de guardias.
- */
 @Entity
 @Table(name = "eventos_turno", indexes = {
     @Index(name = "idx_eventos_turno_estado", columnList = "estado"),

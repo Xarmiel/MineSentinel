@@ -65,7 +65,7 @@ class EntityMappingTest {
         EventoTurno evento = new EventoTurno();
         int totalEntradas = 45;
         int totalSalidas = 43;
-        int diferencia = totalEntradas - totalSalidas; // 2 personas remanentes en socavón
+        int diferencia = totalEntradas - totalSalidas;
 
         CierreAuditoriaTurno cierre = new CierreAuditoriaTurno(evento, totalEntradas, totalSalidas, diferencia, LocalDateTime.now());
         cierre.setAuditoriaId(1L);

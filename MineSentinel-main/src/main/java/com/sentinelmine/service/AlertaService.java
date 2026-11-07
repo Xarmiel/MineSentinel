@@ -16,10 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Servicio de alertas conectado a las tablas normalizadas `faltas_epp` y `anomalias_movimiento`.
- * Proporciona el historial y canaliza notificaciones sin fabricar identidades ni catálogos simulados.
- */
 @Service
 public class AlertaService {
 
@@ -44,11 +40,6 @@ public class AlertaService {
         this.sseNotificationService = sseNotificationService;
     }
 
-    /**
-     * Alertas más recientes para el dashboard y el panel de administración.
-     * Usa la misma consulta unificada del historial para que EPP y anomalías
-     * aparezcan ordenados por fecha real y no por claves primarias separadas.
-     */
     @Transactional(readOnly = true)
     public List<AlertaViewDTO> getAlertasRecientes(int limit) {
         int tamano = Math.max(1, Math.min(limit, HistorialFiltro.PAGE_SIZE_MAX));
@@ -58,28 +49,16 @@ public class AlertaService {
         return historialRepository.buscarLimitado(filtro, tamano);
     }
 
-    /**
-     * Página del historial con filtros aplicados en base de datos.
-     */
     @Transactional(readOnly = true)
     public HistorialPagina getHistorial(HistorialFiltro filtro) {
         return historialRepository.buscar(filtro);
     }
 
-    /**
-     * Resultado completo (hasta un límite de seguridad) de la consulta filtrada,
-     * para exportaciones. No reutiliza la página visible porque el usuario espera
-     * descargar todo lo que coincide con los filtros, no solo la página actual.
-     */
     @Transactional(readOnly = true)
     public List<AlertaViewDTO> getHistorialParaExportar(HistorialFiltro filtro) {
         return historialRepository.buscarLimitado(filtro, LIMITE_EXPORTACION);
     }
 
-    /**
-     * Notifica al jefe de turno disambiguando el tipo de alerta ("EPP" vs "ANOMALIA")
-     * para evitar colisiones entre claves primarias independientes.
-     */
     @Transactional
     public void notificarJefeTurno(long idAlerta, String tipoAlerta) {
         if ("ANOMALIA".equalsIgnoreCase(tipoAlerta)) {
@@ -92,7 +71,6 @@ public class AlertaService {
                 sseNotificationService.emitirEvento("alerta-actualizada", anomalia);
             });
         } else {
-            // Por defecto o si es EPP
             faltaEPPRepository.findById(idAlerta).ifPresentOrElse(falta -> {
                 falta.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                 faltaEPPRepository.save(falta);
@@ -102,7 +80,6 @@ public class AlertaService {
                 notificacionExternaService.despacharNotificacionJefeTurno("Infracción de EPP", desc, rol, falta.getSnapshotUrl());
                 sseNotificationService.emitirEvento("alerta-actualizada", falta);
             }, () -> {
-                // Fallback de búsqueda cruzada si el tipo no coincidiera
                 anomaliaMovimientoRepository.findById(idAlerta).ifPresent(anomalia -> {
                     anomalia.setEstadoAlerta(EstadoAlerta.NOTIFICADA);
                     anomaliaMovimientoRepository.save(anomalia);

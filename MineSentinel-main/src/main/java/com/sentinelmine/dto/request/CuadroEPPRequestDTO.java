@@ -6,15 +6,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Cuadro de cumplimiento de EPP publicado por el motor de visión para la vista
- * de cámara en vivo.
- *
- * A diferencia de las infracciones (que son histórico y disparan alerta), esto
- * es estado de pantalla: el backend lo retiene unos segundos y lo reemite por
- * SSE. Por eso no lleva eventoId ni fecha: describe "ahora mismo", no un hecho
- * que haya que archivar.
- */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class CuadroEPPRequestDTO {
 
@@ -25,14 +16,6 @@ public class CuadroEPPRequestDTO {
     private List<Integer> dimensiones;
     private List<Persona> personas = new ArrayList<>();
 
-    /**
-     * El motor no está ejecutando YOLOv8: publica datos fabricados.
-     *
-     * Existe para que /camara pueda advertirlo en pantalla. En modo simulación
-     * el motor no detecta nada y nunca publica un frame, así que sin esta marca
-     * la vista queda indistinguible de "el detector funciona pero la cámara no
-     * ve a nadie", que es el diagnóstico que más tiempo cuesta en el campo.
-     */
     private Boolean simulacion = Boolean.FALSE;
 
     public CuadroEPPRequestDTO() {
@@ -105,7 +88,6 @@ public class CuadroEPPRequestDTO {
         private List<String> conformes = new ArrayList<>();
         private List<Falta> faltantes = new ArrayList<>();
 
-        /** [x1, y1, x2, y2] en píxeles del frame, si el motor los envía. */
         private List<Integer> caja;
 
         public Integer getTrackId() {

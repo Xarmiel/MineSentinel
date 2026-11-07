@@ -1,22 +1,3 @@
-"""
-MineSentinel — Motor de detección de EPP sobre YOLOv8
-======================================================
-Carga uno o varios modelos de detección de EPP, fusiona sus predicciones,
-asocia cada elemento a la persona que lo porta (anclada por ByteTrack) y
-evalúa el cumplimiento frente a la normativa por rol definida en
-`epp_config.yaml`.
-
-Distinción clave del motor:
-
-  CONFORME  el trabajador porta EPP homologado            -> sin alerta
-  AUSENTE   el modelo detecta que no lo porta             -> alerta FALTANTE
-  IMPOSTOR  porta un objeto no homologado que imita al    -> alerta IMPOSTOR
-            EPP (gorra, gafas de sol, zapatillas)
-
-Las clases IMPOSTOR las declara el usuario en `epp_config.yaml`; ningún modelo
-público de EPP las trae de fábrica, por lo que se reportan solo cuando el
-modelo efectivamente las reconoce.
-"""
 
 import logging
 import os
@@ -29,7 +10,6 @@ import numpy as np
 
 logger = logging.getLogger("MineSentinel.Detector")
 
-# Estados de un elemento de EPP sobre un trabajador
 ESTADO_CONFORME = "CONFORME"
 ESTADO_AUSENTE = "AUSENTE"
 ESTADO_IMPOSTOR = "IMPOSTOR"
@@ -38,7 +18,6 @@ GRAVEDAD_GRAVE = "GRAVE"
 GRAVEDAD_INTERMEDIA = "INTERMEDIO"
 GRAVEDAD_LEVE = "LEVE"
 
-# Estado global del cuadro de una persona: de ahí sale el color del recuadzo.
 CUADRO_CONFORME = "CONFORME"
 CUADRO_INTERMEDIO = "INTERMEDIO"
 CUADRO_CRITICO = "CRITICO"
@@ -49,21 +28,14 @@ COLOR_CUADRO = {
     CUADRO_CRITICO: (0, 0, 235),
 }
 
-# Tipos de infracción reportables al backend
 TIPO_FALTANTE = "FALTANTE"
 TIPO_IMPOSTOR = "IMPOSTOR"
 
-# track_id sintético para hallazgos de EPP que no se pudieron anclar a ninguna persona
 TRACK_SIN_ASIGNAR = -1
 
 
-# =============================================================================
-# ESTRUCTURAS DE DATOS
-# =============================================================================
-
 @dataclass
 class Caja:
-    """Caja delimitadora en coordenadas de píxel del frame original."""
     x1: float
     y1: float
     x2: float
@@ -83,7 +55,6 @@ class Caja:
 
     @property
     def pie(self) -> Tuple[float, float]:
-        """Punto de apoyo (centro inferior): el más estable para el cruce de línea."""
         return ((self.x1 + self.x2) / 2.0, self.y2)
 
     def contiene(self, x: float, y: float) -> bool:
@@ -100,7 +71,6 @@ class Caja:
 
 @dataclass
 class Deteccion:
-    """Una caja detectada ya interpretada por el vocabulario canónico."""
     clase: str
     modelo: str
     caja: Caja
@@ -116,11 +86,10 @@ class Deteccion:
 
 @dataclass
 class Persona:
-    """Un track ByteTrack en el frame actual."""
     track_id: int
     caja: Caja
     confianza: float
-    lado: Optional[str] = None          # "ARRIBA" / "ABAJO" respecto a la línea virtual
+    lado: Optional[str] = None
     elementos: List[Deteccion] = field(default_factory=list)
 
     @property
@@ -130,50 +99,34 @@ class Persona:
 
 @dataclass
 class Infraccion:
-    """Infracción de seguridad lista para enviarse al backend."""
-    tipo: str                          # FALTANTE | IMPOSTOR | ANOMALIA
-    clave: str                         # clave canónica (CASCO, BOTAS, GORRA...)
-    nombre_catalogo: str               # debe existir en catalogo_epp
+    tipo: str
+    clave: str
+    nombre_catalogo: str
     descripcion: str
     confianza: float
     track_id: int
-    clase_detectada: str               # clase del modelo que originó el hallazgo
-    gravedad: str = GRAVEDAD_INTERMEDIA  # GRAVE | INTERMEDIO | LEVE
-    evidencia_directa: bool = True     # False = ausencia inferida, sin caja propia
+    clase_detectada: str
+    gravedad: str = GRAVEDAD_INTERMEDIA
+    evidencia_directa: bool = True
     es_anomalia: bool = False
 
 
 @dataclass
 class FrameAnalisis:
-    """Resultado completo del análisis de un frame."""
     personas: List[Persona] = field(default_factory=list)
     elementos: List[Deteccion] = field(default_factory=list)
-    # Infracciones NUEVAS, ya filtradas por enfriamiento: es lo que se reporta
-    # como alerta al backend.
     infracciones: List[Infraccion] = field(default_factory=list)
-    # Infracciones VIGENTES de este frame, sin filtrar. El cuadro de la vista de
-    # cámara se construye con esta lista: si usara `infracciones`, un trabajador
-    # en periodo de enfriamiento parpadearía a "conforme" aun sin casco.
     estado_actual: List[Infraccion] = field(default_factory=list)
     imagen_anotada: Optional[np.ndarray] = None
     fotograma: int = 0
     fps: float = 0.0
 
 
-# =============================================================================
-# UTILIDADES
-# =============================================================================
-
 def normalizar_clase(clase: str) -> str:
-    """Normaliza el nombre de clase del modelo para compararlo con el mapeo.
-
-    'NO-Safety Vest' -> 'no_safety_vest' ; 'Fall-Detected' -> 'fall_detected'
-    """
     return re.sub(r"[\s\-]+", "_", str(clase).strip().lower()).strip("_")
 
 
 def iou(a: Caja, b: Caja) -> float:
-    """Intersección sobre unión entre dos cajas."""
     x1, y1 = max(a.x1, b.x1), max(a.y1, b.y1)
     x2, y2 = min(a.x2, b.x2), min(a.y2, b.y2)
     if x2 <= x1 or y2 <= y1:
@@ -184,27 +137,18 @@ def iou(a: Caja, b: Caja) -> float:
 
 
 def distancia_fuera(x: float, y: float, caja: Caja) -> float:
-    """Distancia euclídea del punto (x,y) al rectángulo (0 si está dentro)."""
     dx = max(caja.x1 - x, 0.0, x - caja.x2)
     dy = max(caja.y1 - y, 0.0, y - caja.y2)
     return float(np.hypot(dx, dy))
 
 
-# =============================================================================
-# MOTOR DE DETECCIÓN
-# =============================================================================
-
 class DetectorEPP:
-    """Carga los modelos, fusiona detecciones y evalúa el cumplimiento de EPP."""
 
     def __init__(self, config_path: str, confianza: Optional[float] = None,
                 imgsz: Optional[int] = None, device: Optional[str] = None):
-        import yaml  # import diferido: mensaje de error más claro
+        import yaml
 
         self.config_path = config_path
-        # Directorio del config: ancla de todas las rutas relativas declaradas en
-        # él, para que el cliente se pueda lanzar desde cualquier carpeta de
-        # trabajo sin depender del CWD.
         self._base_dir = os.path.dirname(os.path.abspath(config_path))
         with open(config_path, "r", encoding="utf-8") as fh:
             self.cfg: Dict[str, Any] = yaml.safe_load(fh) or {}
@@ -228,8 +172,6 @@ class DetectorEPP:
         self.enfriamiento = float(emision.get("enfriamiento_segundos", 90.0))
         self.frames_estables = int(emision.get("frames_estables", 5))
         self.confianza_minima_alerta = float(emision.get("confianza_minima_alerta", 0.45))
-        # Tracker de episodios del pipeline: cuántos frames consecutivos con
-        # falta antes de abrir una alerta, y cuántos sin falta antes de cerrarla.
         self.segundos_evaluacion = float(emision.get("segundos_evaluacion", 5.0))
         self.frames_abrir = max(1, int(emision.get("frames_abrir", 3)))
         self.frames_cerrar = max(1, int(emision.get("frames_cerrar", 8)))
@@ -241,21 +183,17 @@ class DetectorEPP:
         self.cuadro_publicar_frame = bool(cuadro.get("publicar_frame", True))
         self.cuadro_ancho_maximo = int(cuadro.get("ancho_maximo", 960))
 
-        # clave canónica -> gravedad declarada en el catálogo
         self._gravedad: Dict[str, str] = {}
         for clave, definicion in self.catalogo_epp.items():
             self._gravedad[clave] = str(definicion.get("gravedad", GRAVEDAD_INTERMEDIA)).upper()
         for clave in (self.cfg.get("impostores", {}) or {}).keys():
-            # Un impostor no es "falta un EPP": es EPP homologado ausente Y un
-            # objeto no apto en su lugar. Siempre se escala al máximo.
             self._gravedad[clave] = GRAVEDAD_GRAVE
 
         self._indice_clases: Dict[str, Tuple[Optional[str], str]] = self._construir_indice()
-        self._modelos: List[Tuple[str, Any]] = []          # (nombre, modelo) de EPP
+        self._modelos: List[Tuple[str, Any]] = []
         self._modelo_personas: Optional[Tuple[str, Any]] = None
         self._clases_persona: set = set()
 
-        # Estado de seguimiento entre frames
         self._estado_tracks: Dict[int, Dict[str, Any]] = {}
         self._track_counter = 0
         self._ultimas_dimensiones: Optional[Tuple[int, int]] = None
@@ -267,12 +205,8 @@ class DetectorEPP:
         self._cargar_modelos(modelo_cfg)
         self._advertir_reglas_no_verificables()
 
-    # -------------------------------------------------------------------------
-    # CARGA
-    # -------------------------------------------------------------------------
 
     def _construir_indice(self) -> Dict[str, Tuple[Optional[str], str]]:
-        """clase_normalizada -> (clave canónica, estado)."""
         indice: Dict[str, Tuple[Optional[str], str]] = {}
 
         for clave, mapeo in (self.cfg.get("mapeo_clases", {}) or {}).items():
@@ -292,15 +226,9 @@ class DetectorEPP:
         return indice
 
     def _ruta_local(self, ruta: str) -> str:
-        """Resuelve una ruta declarada en el config contra su propio directorio.
-
-        Las absolutas se respetan tal cual; las relativas se anclan al directorio
-        de `epp_config.yaml`, de modo que mover el proyecto no rompe el cliente.
-        """
         return ruta if os.path.isabs(ruta) else os.path.join(self._base_dir, ruta)
 
     def _resolver_pesos(self, definicion: Dict[str, Any]) -> str:
-        """Devuelve una ruta local a los pesos, descargándolos de HuggingFace si hace falta."""
         ruta = definicion.get("ruta")
         if ruta:
             ruta = self._ruta_local(ruta)
@@ -336,15 +264,12 @@ class DetectorEPP:
             self._modelos.append((nombre, modelo))
             logger.info("Modelo de EPP '%s' cargado desde %s (%d clases)", nombre, pesos, len(nombres))
 
-        # --- Detector de personas (ancla de tracking y de cumplimiento) -------
         personas_cfg = modelo_cfg.get("personas")
         if personas_cfg:
             nombre = personas_cfg.get("nombre", "personas")
             pesos = personas_cfg.get("ruta") or personas_cfg.get("pesos") or "yolov8n.pt"
             pesos = self._ruta_local(pesos)
             if not os.path.isfile(pesos):
-                # No está junto al config: se deja el nombre desnudo para que
-                # Ultralytics lo descargue a su caché global.
                 pesos = personas_cfg.get("ruta") or personas_cfg.get("pesos") or "yolov8n.pt"
                 logger.info("Descargando detector de personas: %s", pesos)
             modelo = YOLO(pesos)
@@ -359,7 +284,6 @@ class DetectorEPP:
             self._clases_persona = declaradas
             logger.info("Detector de personas '%s' cargado (%s)", nombre, pesos)
         else:
-            # Reserva: se usan las clases persona del propio modelo de EPP.
             declaradas = {normalizar_clase(c) for c in principal.get("clases_persona", ["person"])}
             self._clases_persona = declaradas
             logger.warning(
@@ -383,12 +307,8 @@ class DetectorEPP:
                     clave_rol, ", ".join(no_verificables),
                 )
 
-    # -------------------------------------------------------------------------
-    # INFERENCIA
-    # -------------------------------------------------------------------------
 
     def _convertir(self, resultado: Any, nombre: str, con_track: bool) -> List[Deteccion]:
-        """Traduce un resultado de Ultralytics a detecciones con vocabulario canónico."""
         salida: List[Deteccion] = []
         cajas = getattr(resultado, "boxes", None)
         if cajas is None or len(cajas) == 0:
@@ -420,7 +340,6 @@ class DetectorEPP:
         return salida
 
     def _inferir_personas(self, frame: np.ndarray) -> List[Deteccion]:
-        """Detecta y rasteriza personas. Es el único punto que genera track_id."""
         argumentos = dict(
             conf=0.30,
             iou=self.iou_umbral,
@@ -429,8 +348,6 @@ class DetectorEPP:
             verbose=False,
         )
         nombre, modelo = self._modelo_personas
-        # Ultralytics exige model.track() explícito para activar ByteTrack;
-        # model(frame, persist=...) ya no es una llamada válida en 8.4+.
         resultados = modelo.track(frame, persist=True, tracker=self._tracker_path, **argumentos)
         detecciones: List[Deteccion] = []
         for resultado in resultados or []:
@@ -438,7 +355,6 @@ class DetectorEPP:
         return [d for d in detecciones if d.clave == "__persona__"]
 
     def _inferir_epp(self, frame: np.ndarray) -> List[Deteccion]:
-        """Detecta elementos de EPP. Sin tracking: solo aportan caja y estado."""
         argumentos = dict(
             conf=self.confianza,
             iou=self.iou_umbral,
@@ -456,11 +372,9 @@ class DetectorEPP:
         return self._fusionar(detecciones)
 
     def _inferir(self, frame: np.ndarray) -> Tuple[List[Deteccion], List[Deteccion]]:
-        """Devuelve (personas rastreadas, elementos de EPP fusionados)."""
         if self._modelo_personas is not None:
             return self._inferir_personas(frame), self._inferir_epp(frame)
 
-        # Reserva: sin detector dedicado, el propio modelo de EPP hace de ancla.
         argumentos = dict(
             conf=self.confianza, iou=self.iou_umbral, imgsz=self.imgsz,
             device=self.device, verbose=False,
@@ -476,7 +390,6 @@ class DetectorEPP:
 
     @staticmethod
     def _fusionar(detecciones: List[Deteccion]) -> List[Deteccion]:
-        """NMS entre modelos: si dos modelos detectan lo mismo, gana el más confiado."""
         ordenadas = sorted(detecciones, key=lambda d: d.confianza, reverse=True)
         conservadas: List[Deteccion] = []
         for deteccion in ordenadas:
@@ -485,18 +398,8 @@ class DetectorEPP:
             conservadas.append(deteccion)
         return conservadas
 
-    # -------------------------------------------------------------------------
-    # ASIGNACIÓN ELEMENTO -> PERSONA
-    # -------------------------------------------------------------------------
 
     def _asociar(self, personas: List[Persona], elementos: List[Deteccion]) -> List[Deteccion]:
-        """Asigna cada EPP a la persona que lo porta.
-
-        Devuelve los elementos sin dueño. Un elemento sin dueño NO se descarta: si
-        es una ausencia explícita ("no_helmet") o un impostor, se reporta igual con
-        track_id = TRACK_SIN_ASIGNAR, porque en una mina ese hallazgo crítico puede
-        llegar de un trabajador lejano que el detector de personas no resolvió.
-        """
         sueltos: List[Deteccion] = []
         for elemento in elementos:
             cx, cy = elemento.caja.centro
@@ -521,14 +424,8 @@ class DetectorEPP:
                 sueltos.append(elemento)
         return sueltos
 
-    # -------------------------------------------------------------------------
-    # REGLAS DE CUMPLIMIENTO
-    # -------------------------------------------------------------------------
 
     def epp_obligatorio(self, rol_id: int) -> Tuple[List[str], str]:
-        """Devuelve (claves obligatorias, nombre del rol) según la configuración."""
-        # PyYAML entrega claves numéricas de `roles:` como enteros, pero un rol_id
-        # puede llegar como string desde la CLI o el backend.
         regla = self.roles_cfg.get(rol_id) or self.roles_cfg.get(str(rol_id)) or self.roles_cfg.get("*") or {}
         claves = [c for c in (regla.get("obligatorio") or [])
                   if (self.catalogo_epp.get(c, {}) or {}).get("verificable", False)]
@@ -536,16 +433,9 @@ class DetectorEPP:
 
     def _evaluar_hallazgos(self, elementos: List[Deteccion], track_id: int,
                         obligatorios: List[str]) -> List[Infraccion]:
-        """Convierte detecciones de EPP en infracciones evaluando el cumplimiento.
-
-        Cubre dos casos con la misma lógica:
-          - los elementos asignados a una persona (track_id real), y
-          - los elementos sin persona dueña (track_id = TRACK_SIN_ASIGNAR).
-        """
         infracciones: List[Infraccion] = []
         detectados = {d.clave for d in elementos if d.clave and d.estado == ESTADO_CONFORME}
 
-        # --- 1. EPP homologado ausente -------------------------------------
         for clave in obligatorios:
             meta = self.catalogo_epp.get(clave, {}) or {}
             if not meta.get("verificable", False):
@@ -567,8 +457,6 @@ class DetectorEPP:
                     evidencia_directa=True,
                 ))
             elif track_id != TRACK_SIN_ASIGNAR:
-                # Sin caja que lo respalde sólo se infiere si el EPP es obligatorio;
-                # para un hallazgo suelto no hay evidencia de a quién corresponde.
                 infracciones.append(Infraccion(
                     tipo=TIPO_FALTANTE,
                     clave=clave,
@@ -581,8 +469,6 @@ class DetectorEPP:
                     evidencia_directa=False,
                 ))
 
-        # --- 2. Instrumentos no aptos (gorra, gafas de sol, zapatillas) -------
-        # Se reportan aunque el EPP sustituido no sea obligatorio para el rol.
         impostores_cfg = self.cfg.get("impostores", {}) or {}
         for deteccion in elementos:
             if deteccion.estado == ESTADO_IMPOSTOR:
@@ -614,9 +500,6 @@ class DetectorEPP:
 
         return infracciones
 
-    # -------------------------------------------------------------------------
-    # FILTRADO POR ENFRIAMIENTO
-    # -------------------------------------------------------------------------
 
     def _debe_emitir(self, track_id: int, infraccion: Infraccion, ahora: float) -> bool:
         estado = self._estado_tracks.setdefault(track_id, {"ultimo": {}, "frames_limpios": 0})
@@ -630,13 +513,9 @@ class DetectorEPP:
         estado = self._estado_tracks.setdefault(track_id, {"ultimo": {}, "frames_limpios": 0})
         estado["frames_limpios"] = estado["frames_limpios"] + 1 if limpio else 0
 
-    # -------------------------------------------------------------------------
-    # CUADRO DE CUMPLIMIENTO (estado por persona para la vista de cámara)
-    # -------------------------------------------------------------------------
 
     @staticmethod
     def _estado_cuadro(infracciones: List[Infraccion]) -> str:
-        """Reduce las infracciones de una persona a un único color."""
         if not infracciones:
             return CUADRO_CONFORME
         gravedad = max((i.gravedad for i in infracciones),
@@ -644,11 +523,6 @@ class DetectorEPP:
         return CUADRO_CRITICO if gravedad == GRAVEDAD_GRAVE else CUADRO_INTERMEDIO
 
     def construir_cuadro(self, analisis: FrameAnalisis, rol_id: int = 1) -> Dict[str, Any]:
-        """Arma el payload del cuadro en vivo: una fila por persona detectada.
-
-        Es estado de pantalla, no historial: el backend lo guarda unos segundos
-        y lo reemite por SSE. Por eso no pasa por el enfriamiento de alertas.
-        """
         obligatorios, nombre_rol = self.epp_obligatorio(rol_id)
 
         filas: List[Dict[str, Any]] = []
@@ -656,8 +530,6 @@ class DetectorEPP:
             propias = [i for i in analisis.estado_actual if i.track_id == persona.track_id]
             estado = self._estado_cuadro(propias)
 
-            # Lo más grave primero: el supervisor debe ver el casco en la
-            # cima de la lista, no el chaleco.
             orden = {GRAVEDAD_GRAVE: 0, GRAVEDAD_INTERMEDIA: 1, GRAVEDAD_LEVE: 2}
             faltantes = [
                 {
@@ -697,16 +569,13 @@ class DetectorEPP:
             "personas": filas,
         }
 
-    # -------------------------------------------------------------------------
-    # ANOTACIÓN DE LA EVIDENCIA
-    # -------------------------------------------------------------------------
 
     COLORES = {
-        ESTADO_CONFORME: (34, 197, 94),     # verde
-        ESTADO_AUSENTE: (239, 68, 68),       # rojo
-        ESTADO_IMPOSTOR: (249, 115, 22),     # naranja
-        "ANOMALIA": (168, 85, 247),          # morado
-        "OTRO": (148, 163, 184),             # gris
+        ESTADO_CONFORME: (34, 197, 94),
+        ESTADO_AUSENTE: (239, 68, 68),
+        ESTADO_IMPOSTOR: (249, 115, 22),
+        "ANOMALIA": (168, 85, 247),
+        "OTRO": (148, 163, 184),
     }
 
     @staticmethod
@@ -749,7 +618,6 @@ class DetectorEPP:
                 etiqueta += f" - {len(propias)} falta(s)"
             self._texto(cv2, imagen, etiqueta, (x1, y1 - 4), color, 0.5)
 
-        # Panel de resumen
         nuevas = [i for i in analisis.infracciones if not i.es_anomalia]
         resumen = f"PERSONAS: {len(analisis.personas)}   INFRACCIONES NUEVAS: {len(nuevas)}"
         cv2.rectangle(imagen, (0, 0), (ancho, 26), (18, 22, 30), -1)
@@ -757,12 +625,8 @@ class DetectorEPP:
 
         return imagen
 
-    # -------------------------------------------------------------------------
-    # API PÚBLICA
-    # -------------------------------------------------------------------------
 
     def analizar(self, frame: np.ndarray, rol_id: int = 1, linea: Optional[float] = None) -> FrameAnalisis:
-        """Analiza un frame y devuelve el estado de cumplimiento de todas las personas."""
         inicio = time.time()
         self._contador_fotogramas += 1
         ahora = time.time()
@@ -783,8 +647,6 @@ class DetectorEPP:
         vigentes: List[Infraccion] = []
         for persona in personas:
             candidatas = self._evaluar_hallazgos(persona.elementos, persona.track_id, obligatorios)
-            # Tras evaluar, la persona conserva sólo su EPP conforme: es lo que
-            # determina el color de la caja en la evidencia (rojo si le falta algo).
             persona.elementos = [d for d in persona.elementos if d.estado == ESTADO_CONFORME]
             vigentes.extend(candidatas)
             nuevas.extend(i for i in candidatas if self._debe_emitir(persona.track_id, i, ahora))
@@ -795,8 +657,6 @@ class DetectorEPP:
             vigentes.extend(candidatas)
             nuevas.extend(i for i in candidatas if self._debe_emitir(TRACK_SIN_ASIGNAR, i, ahora))
 
-        # Limpieza de tracks desaparecidos (libera el enfriamiento).
-        # TRACK_SIN_ASIGNAR es persistente: su enfriamiento se agota por tiempo.
         vivos = {p.track_id for p in personas}
         for track_id in list(self._estado_tracks):
             if track_id not in vivos and track_id != TRACK_SIN_ASIGNAR:
@@ -820,5 +680,5 @@ class DetectorEPP:
                 predictor = getattr(modelo, "predictor", None)
                 if predictor is not None:
                     predictor.stream = False
-            except Exception:  # pragma: no cover - limpieza best-effort
+            except Exception:
                 pass

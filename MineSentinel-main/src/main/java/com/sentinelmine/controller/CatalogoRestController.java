@@ -16,9 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Controlador REST para la consulta de catálogos maestros del sistema de seguridad minera.
- */
 @RestController
 @RequestMapping("/api/v1/catalogos")
 @CrossOrigin(origins = "*")

@@ -60,36 +60,24 @@
     </div>
 </main>
 <script type="module">
-// =====================================================================
-    // 1. CUADRO DE CUMPLIMIENTO (SSE) - datos del motor YOLOv8 real
-    // =====================================================================
     const ETIQUETA = {
         CONFORME: 'CONFORME',
         INTERMEDIO: 'INTERMEDIO',
         CRITICO: 'CRÍTICO'
     };
 
-    // Mismos colores que .chip / .leyenda-dot en style.css, para que el recuadro
-    // sobre el vídeo y la fila de la tabla signalen exactamente lo mismo.
     const COLOR_ESTADO = {
         CONFORME: '#22c55e',
         INTERMEDIO: '#f97316',
         CRITICO: '#ef4444'
     };
 
-    // Lo más grave primero. En el vídeo manda el solape de cajas; en la tabla,
-    // que el supervisor recorre de arriba abajo, es lo que decide si repara en
-    // la última fila.
     const ORDEN_ESTADO = { CRITICO: 0, INTERMEDIO: 1, CONFORME: 2 };
 
     const cuerpoCuadro = document.getElementById('cuadroCuerpo');
     const estadoCuadro = document.getElementById('cuadroEstado');
     const avisoMotor = document.getElementById('avisoMotor');
 
-    // Último cuadro recibido. La tabla se repinta en cada evento SSE, pero el
-    // recuadro sobre el vídeo también se redibuja cuando llega una imagen
-    // nueva: el frame y el cuadro viajan por caminos distintos y a cadencia
-    // distinta, así que se guardan por separado y se cruzan al pintar.
     let ultimoCuadro = null;
 
     function escapar(texto) {
@@ -110,10 +98,6 @@
         });
     }
 
-    // El modo simulación del cliente publica datos fabricados sin ejecutar
-    // YOLOv8, así que nunca manda frame ni detecciones. Sin este aviso la vista
-    // queda igual que cuando el detector sí funciona pero no ve a nadie, y el
-    // diagnóstico se va por el camino equivocado.
     function mostrarAvisoSimulacion(activo) {
         if (!avisoMotor) return;
         avisoMotor.className = activo ? 'aviso-motor visible' : 'aviso-motor';
@@ -162,8 +146,6 @@
             const conformes = (p.conformes || []).join(', ') || '—';
             const obligatorios = (p.obligatorios || []).length;
 
-            // "3/4" responde de un vistazo a lo que el supervisor quiere saber:
-            // no qué lleva puesto, sino cuánto le falta de lo que debía.
             const progreso = obligatorios
                 ? '<strong>' + (p.conformes || []).length + '</strong> / ' + obligatorios
                 : '—';
@@ -197,8 +179,6 @@
     }
 
     function conectarCuadro() {
-        // Estado inicial: si el motor ya publicó algo, se muestra de inmediato
-        // en lugar de esperar al primer evento SSE.
         fetch('/api/v1/vision/cuadro')
             .then(r => r.ok ? r.json() : null)
             .then(c => { if (c) pintarCuadro(c); })
@@ -220,14 +200,6 @@
         };
     }
 
-    // =====================================================================
-    // 2. FRAME DEL MOTOR DE VISION
-    // -----------------------------------------------------------------
-    // Esta vista NO abre la webcam. La consume el motor de YOLOv8, que es su
-    // unico propietario: una webcam solo admite un proceso a la vez, y cuando
-    // el motor la tiene el navegador recibe "Could not start video source".
-    // Por eso el motor publica el frame ya anotado y aqui solo se pinta.
-    // =====================================================================
     const estadoDeteccion = document.getElementById('estadoDeteccion');
     function setEstado(texto) {
         estadoDeteccion.textContent = texto;
@@ -239,26 +211,12 @@
     const overlay = document.getElementById('overlayCamara');
     let hayFrame = false;
 
-    // -----------------------------------------------------------------
-    // 2.1. RECUADROS DE CUMPLIMIENTO SOBRE EL VIDEO
-    // -----------------------------------------------------------------
-    // El motor ya dibuja las cajas de EPP en el JPEG que publica, pero no las
-    // de las personas: el color por estado que usa el supervisor para decidir
-    // se calcula en el navegador, a partir del `caja` y el `estado` de cada fila del
-    // cuadro. Sin esto el canvas quedaba vacío y la vista perdía la única
-    // señal que permite actuar sin mirar la tabla.
     function limpiarOverlay() {
         if (!overlay) return;
         overlay.width = 0;
         overlay.height = 0;
     }
 
-    // El motor analiza el frame ORIGINAL y serializa `caja` en sus píxeles, pero
-    // luego reescala la imagen anotada a `ancho_maximo` antes de subirla
-    // (ver _publicar_frame en yolo_sentinel_client.py). Encima, el <img> usa
-    // `object-fit: cover`, así que el navegador puede recortar los bordes de la
-    // imagen. Las cajas sólo caen en su sitio si se mapperan por la geometría
-    // real de la imagen, no con un factor único ingenuo.
     function escalaCajas() {
         const anchoNatural = marcoMotor.naturalWidth;
         const altoNatural = marcoMotor.naturalHeight;
@@ -267,14 +225,9 @@
         const caja = overlay.getBoundingClientRect();
         if (!caja.width || !caja.height) return null;
 
-        // `cover` = la imagen escala hasta cubrir el contenedor y se recorta por
-        // el centro; por eso el desplazamiento sale negativo en el eje recortado.
         const escala = Math.max(caja.width / anchoNatural, caja.height / altoNatural);
 
         const dim = (ultimoCuadro && ultimoCuadro.dimensiones) || null;
-        // `dimensiones` es el tamaño del frame sobre el que el motor calculó las
-        // cajas. Si no llega (cliente viejo o cuadro a medio construir) se asume
-        // que ya viene en los píxeles de la imagen publicada.
         const refAncho = (Array.isArray(dim) && dim[0]) || anchoNatural;
         const refAlto = (Array.isArray(dim) && dim[1]) || altoNatural;
 
@@ -297,8 +250,6 @@
         const caja = overlay.getBoundingClientRect();
         if (!caja.width || !caja.height) return;
 
-        // El canvas se dimensiona en píxeles físicos: usar el tamaño CSS tal cual
-        // deja el trazo borroso en pantallas HiDPI y duplica el trabajo de pintado.
         const dpr = window.devicePixelRatio || 1;
         const ancho = Math.round(caja.width * dpr);
         const alto = Math.round(caja.height * dpr);
@@ -333,14 +284,11 @@
             ctx.strokeStyle = color;
             ctx.strokeRect(x, y, w, h);
 
-            // La etiqueta lleva el track y cuántos elementos faltan: el color
-            // dice la gravedad, el número dice si hay que acercarse a mirar.
             const faltantes = (p.faltantes || []).length;
             const texto = '#' + (p.trackId != null ? p.trackId : '?') +
                 (faltantes ? ' · ' + faltantes : ' ✓');
 
             const anchoTexto = ctx.measureText(texto).width;
-            // Encima de la caja salvo que se salga por arriba; en ese caso, dentro.
             const etiquetaY = y >= 16 ? y - 16 : y + 1;
             ctx.fillStyle = color;
             ctx.fillRect(x, etiquetaY, anchoTexto + 8, 15);
@@ -349,9 +297,6 @@
         });
     }
 
-    // La imagen y el cuadro llegan por vías independientes, así que el overlay se
-    // repinta cuando aparece cada frame nuevo y también al cambiar el tamaño de
-    // la ventana: en móvil, al rotar, las cajas se descuadrarían si no.
     marcoMotor.addEventListener('load', pintarOverlay);
     window.addEventListener('resize', pintarOverlay);
 
@@ -371,10 +316,6 @@
         placeholderCamara.style.display = 'none';
     }
 
-    // El video llega como MJPEG continuo (VisionStreamService): el <img> pinta cada
-    // frame según lo publica el motor, sin sondear JPEG sueltos. "Sin senal" se
-    // decide con /estado porque un <img> MJPEG no avisa cuando deja de recibir
-    // frames: se quedaria con la ultima imagen congelada.
     const URL_STREAM = '/api/v1/vision/stream.mjpg';
     const SIN_SENAL_MS = 3000;
 
@@ -384,8 +325,6 @@
         ocultarPlaceholder();
     }
 
-    // Si el backend corta la conexion, se suelta el src y la siguiente
-    // comprobacion reconecta.
     marcoMotor.addEventListener('error', () => mostrarPlaceholder('Motor de vision sin senal'));
 
     async function comprobarSenal() {
@@ -407,10 +346,6 @@
     comprobarSenal();
     setInterval(comprobarSenal, 1000);
 
-    // Se conecta al final y no al declarar la función: pintarCuadro() toca el
-    // overlay, que aún no existe como elemento hasta que se declara `overlay`
-    // más arriba. Sus callbacks llegan de forma asíncrona, pero dejarla al final
-    // evita depender de ese detalle.
     conectarCuadro();
 </script>
 </body>

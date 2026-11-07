@@ -4,9 +4,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Configuración de Spring MVC para el registro de interceptores de sesión y recursos.
- */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
@@ -26,7 +23,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/css/**",
                         "/js/**",
                         "/images/**",
-                        "/api/v1/**",
                         "/favicon.ico"
                 );
     }

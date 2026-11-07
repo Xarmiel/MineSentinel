@@ -21,13 +21,6 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Servicio encargado de la gestión del ciclo de vida y auditoría de los eventos de turno mineros.
- * 
- * ARQUITECTURA: Diseñado para soportar múltiples turnos activos en paralelo sin bloqueos globales,
- * permitiendo el traslape de guardias (shift overlap) durante los relevos operativos y garantizando
- * consistencia y atomicidad transaccional durante el cierre y conciliación de aforo.
- */
 @Service
 public class EventoTurnoService {
 
@@ -54,15 +47,6 @@ public class EventoTurnoService {
         this.sseNotificationService = sseNotificationService;
     }
 
-    /**
-     * Inicia una nueva instancia de turno operativa (EventoTurno).
-     * Permite abrir un nuevo turno conviviendo fluidamente y sin bloqueos de concurrencia
-     * con cualquier turno precedente que permanezca en estado ACTIVO (solapamiento de guardias).
-     *
-     * @param turnoId      Identificador del turno base
-     * @param fechaInicio  Fecha/hora de inicio programada (o actual si es null)
-     * @return El EventoTurno activo creado y persistido
-     */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public EventoTurno abrirTurno(Long turnoId, LocalDateTime fechaInicio) {
         Turno turno = turnoRepository.findById(turnoId)
@@ -86,18 +70,6 @@ public class EventoTurnoService {
         return guardado;
     }
 
-    /**
-     * Cierra un evento de turno de manera transaccional y determinista:
-     * 1. Valida que el evento se encuentre en estado ACTIVO y no posea auditoría previa.
-     * 2. Consulta y consolida automáticamente todos los registros de MovimientosAforo de ese evento_id,
-     *    filtrando EXCLUSIVAMENTE los roles que tienen requiere_aforo = true.
-     * 3. Calcula total_entradas, total_salidas y la diferencia (balance de personal).
-     * 4. Inserta el resultado consolidado inmutable en cierres_auditoria_turno.
-     * 5. Actualiza el estado a CERRADO con su fecha_fin respectiva en la misma transacción atómica.
-     *
-     * @param eventoId Identificador del evento de turno a cerrar
-     * @return DTO con los detalles consolidados del cierre y balance de auditoría
-     */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public CierreTurnoResponseDTO cerrarTurno(Long eventoId) {
         EventoTurno evento = eventoTurnoRepository.findByIdWithTurno(eventoId)
@@ -117,14 +89,12 @@ public class EventoTurnoService {
 
         LocalDateTime fechaCierre = LocalDateTime.now();
 
-        // 1. Conteo consolidado de entradas y salidas filtrando EXCLUSIVAMENTE roles con requiere_aforo = true
         int totalEntradas = (int) movimientoAforoRepository
                 .countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(eventoId, TipoMovimiento.ENTRADA);
         int totalSalidas = (int) movimientoAforoRepository
                 .countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(eventoId, TipoMovimiento.SALIDA);
         int diferencia = totalEntradas - totalSalidas;
 
-        // 2. Creación y persistencia de la auditoría de cierre en PostgreSQL/Supabase
         CierreAuditoriaTurno auditoria = new CierreAuditoriaTurno(
                 evento,
                 totalEntradas,
@@ -134,7 +104,6 @@ public class EventoTurnoService {
         );
         CierreAuditoriaTurno auditoriaGuardada = cierreAuditoriaTurnoRepository.save(auditoria);
 
-        // 3. Cierre y actualización de estado del evento en la misma unidad transaccional
         evento.setEstado(EstadoTurno.CERRADO);
         evento.setFechaFin(fechaCierre);
         eventoTurnoRepository.save(evento);
@@ -142,7 +111,6 @@ public class EventoTurnoService {
         log.info("Evento de turno #{} cerrado exitosamente. Auditoría #{} generada (Entradas: {}, Salidas: {}, Diferencia: {})",
                 eventoId, auditoriaGuardada.getAuditoriaId(), totalEntradas, totalSalidas, diferencia);
 
-        // 4. Diagnóstico de auditoría de personal en socavón
         String mensajeAuditoria;
         if (diferencia == 0) {
             mensajeAuditoria = "Cierre exitoso: Balance cuadrado de personal (0 remanentes en socavón).";
@@ -173,21 +141,6 @@ public class EventoTurnoService {
         return responseDTO;
     }
 
-    /**
-     * Resuelve de forma inteligente y determinista el EventoTurno activo correspondiente
-     * para un cruce de aforo durante periodos de solapamiento de guardias.
-     *
-     * Reglas de resolución operativa:
-     * - Si hay un único turno activo, se asocia directamente a este.
-     * - Si hay solapamiento (2 o más turnos activos):
-     *     * ENTRADA: Se asigna a la guardia ENTRANTE (el turno activo más reciente).
-     *     * SALIDA: Se asigna a la guardia SALIENTE (el turno activo más antiguo que concluye guardia).
-     * - Si no hay turnos activos, crea/recupera un turno de contingencia para no perder telemetría de visión.
-     *
-     * @param fechaHora        Momento del cruce registrado por ByteTrack
-     * @param tipoMovimiento   ENTRADA o SALIDA
-     * @return El EventoTurno activo correspondiente
-     */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public EventoTurno resolverEventoActivoParaMovimiento(LocalDateTime fechaHora, TipoMovimiento tipoMovimiento) {
         List<EventoTurno> turnosActivos = eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
@@ -201,16 +154,12 @@ public class EventoTurnoService {
             return turnosActivos.get(0);
         }
 
-        // Caso de Solapamiento de Turnos (Shift Overlap: relevo de personal en boca-mina)
-        // turnosActivos está ordenado por fechaInicio DESC (el índice 0 es el más nuevo, el último es el más antiguo)
         if (TipoMovimiento.ENTRADA.equals(tipoMovimiento)) {
-            // El personal que ingresa pertenece a la nueva guardia entrante
             EventoTurno turnoEntrante = turnosActivos.get(0);
             log.debug("Solapamiento detectado: Cruce ENTRADA asignado al turno entrante #{} ({})",
                     turnoEntrante.getEventoId(), turnoEntrante.getTurno().getNombre());
             return turnoEntrante;
         } else {
-            // El personal que sale pertenece a la guardia saliente
             EventoTurno turnoSaliente = turnosActivos.get(turnosActivos.size() - 1);
             log.debug("Solapamiento detectado: Cruce SALIDA asignado al turno saliente #{} ({})",
                     turnoSaliente.getEventoId(), turnoSaliente.getTurno().getNombre());
@@ -218,26 +167,16 @@ public class EventoTurnoService {
         }
     }
 
-    /**
-     * Obtiene la lista de todos los turnos que están actualmente operando en paralelo.
-     */
     @Transactional(readOnly = true)
     public List<EventoTurno> listarTurnosActivos() {
         return eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO);
     }
 
-    /**
-     * Indica si actualmente existe solapamiento operativo entre dos o más guardias.
-     */
     @Transactional(readOnly = true)
     public boolean haySolapamientoTurnos() {
         return listarTurnosActivos().size() > 1;
     }
 
-    /**
-     * Devuelve una descripción legible de los turnos en ejecución,
-     * reflejando si existe solapamiento entre guardias.
-     */
     @Transactional(readOnly = true)
     public String obtenerDescripcionTurnosActivos() {
         List<EventoTurno> activos = listarTurnosActivos();
@@ -253,9 +192,6 @@ public class EventoTurnoService {
                 .orElse("Relevo de guardia");
     }
 
-    /**
-     * Retorna exclusivamente el primer turno guardado o activo para la pestaña superior (Topbar).
-     */
     @Transactional(readOnly = true)
     public String obtenerTurnoTopbar() {
         List<EventoTurno> activos = listarTurnosActivos();
@@ -268,10 +204,6 @@ public class EventoTurnoService {
                 .orElse("Sin guardia activa");
     }
 
-    /**
-     * Avanza al siguiente turno disponible en la tabla 'turnos',
-     * cerrando los turnos activos previos e iniciando el nuevo turno.
-     */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public EventoTurno pasarSiguienteTurno() {
         List<Turno> turnos = turnoRepository.findAll().stream()
@@ -348,7 +280,6 @@ public class EventoTurnoService {
         if (inicio.isBefore(fin)) {
             return !hora.isBefore(inicio) && !hora.isAfter(fin);
         } else {
-            // Turno que cruza la medianoche (e.g. 23:00 a 07:30)
             return !hora.isBefore(inicio) || !hora.isAfter(fin);
         }
     }

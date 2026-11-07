@@ -1,20 +1,3 @@
-"""
-Pruebas del contrato entre el modelo de EPP y las reglas de cumplimiento.
-=======================================================================
-Sin dependencias externas: se ejecuta con la stdlib. Desde `python_client/`:
-
-    python -m unittest tests.test_reglas_epp -v
-
-No uses `unittest discover` sobre la raíz: `runs/` tiene miles de artefactos de
-Ultralytics y el descubrimiento se arrastra por ellos.
-
-Por qué son pruebas y no una comprobación manual: `verificable: false` no es un
-ajuste de estilo, es un interruptor que apaga la alerta DE SILENCIO (ver
-DetectorEPP.epp_obligatorio y _evaluar_hallazgos). Basta con que alguien lo
-vuelva a poner en `false` para que el sistema deje de avisar de un casco o un
-chaleco sin que nada falle: no hay excepción, ni log de error, ni test roto.
-Estas pruebas son el candado de esa decisión.
-"""
 
 import os
 import unittest
@@ -26,9 +9,6 @@ from epp_detector import DetectorEPP
 CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "epp_config.yaml")
 
-# Clases que expone `best_sentinel_v2.pt`. Si se reentrena el modelo, esta
-# lista es lo primero que hay que actualizar, y el fallo sale aquí en vez de
-# en production, donde el síntoma es "no le faltan cascos a nadie".
 CLASES_DEL_MODELO = ["gloves", "goggles", "helmet", "vest"]
 
 
@@ -38,7 +18,6 @@ def cargar_config():
 
 
 class TestMapeoDeClases(unittest.TestCase):
-    """Cada clase del modelo tiene que aterrizar en una clave canónica."""
 
     def setUp(self):
         self.cfg = cargar_config()
@@ -53,9 +32,6 @@ class TestMapeoDeClases(unittest.TestCase):
                          f"clases del modelo sin mapeo en 'mapeo_clases': {sin_mapeo}")
 
     def test_cada_clase_mapeada_es_verificable(self):
-        # Este es el test que importa: una clase correctamente mapeada pero con
-        # verificable=false se detecta, se pinta en el cuadro, y no genera
-        # ninguna alerta. El fallo es invisible salvo por la ausencia de avisos.
         no_verificables = {}
         for clase in CLASES_DEL_MODELO:
             clave = self.indice.get(clase)
@@ -73,14 +49,9 @@ class TestMapeoDeClases(unittest.TestCase):
                     f"{clave} es obligatorio en varios roles pero nadie lo verifica")
 
     def test_el_calzado_no_se_promete(self):
-        # El modelo no tiene clase de calzado. Mantenerlo en false es
-        # deliberado: es preferible no avisar a decir "falta botas" sin mirarla.
         self.assertFalse(self.cfg["catalogo_epp"]["BOTAS"]["verificable"])
 
     def test_ningun_rol_exige_un_elemento_no_verificable_silencioso(self):
-        # Los roles sí pueden exigirlo (BOTAS lo es), pero el motor lo descarta
-        # con un aviso por consola. Que el requisito exista no implica que se
-        # pueda cumplir: lo que no debe pasar es que quede en silencio.
         for rol, regla in self.cfg["roles"].items():
             sin_verificar = [c for c in (regla.get("obligatorio") or [])
                              if not (self.cfg["catalogo_epp"].get(c) or {}).get("verificable")]
@@ -91,10 +62,8 @@ class TestMapeoDeClases(unittest.TestCase):
 
 
 class TestRutasDeModelos(unittest.TestCase):
-    """Las rutas del config se resuelven contra el config, no contra el CWD."""
 
     class _Falso:
-        """Stub: _ruta_local solo usa self._base_dir, no hace falta cargar YOLO."""
         def __init__(self, base):
             self._base_dir = base
 
@@ -115,9 +84,6 @@ class TestRutasDeModelos(unittest.TestCase):
                          os.path.normcase(absoluta))
 
     def test_el_pesos_declarado_existe_de_verdad(self):
-        # Regresión: el config declaraba una ruta absoluta a una carpeta del
-        # equipo que lo entrenó, así que en cualquier otra máquina el cliente
-        # moría con FileNotFoundError al arrancar.
         pesos = self._ruta_local(cargar_config()["modelo"]["principal"]["ruta"])
         self.assertTrue(os.path.isfile(pesos), f"pesos declarados no existen: {pesos}")
 

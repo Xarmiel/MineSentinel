@@ -145,7 +145,7 @@ class MovimientoAforoServiceTest {
         assertNotNull(response);
         assertEquals(35, response.getAforoActual());
         assertEquals(50, response.getAforoMaximo());
-        assertEquals(70, response.getPorcentajeCapacidad()); // (35/50) * 100 = 70%
+        assertEquals(70, response.getPorcentajeCapacidad());
         assertEquals("AFORO NORMAL", response.getEstadoAforo());
         assertEquals(1, response.getCantidadTurnosActivos());
         assertEquals(25, response.getConteoPorRol().get("Operador de Perforación"));

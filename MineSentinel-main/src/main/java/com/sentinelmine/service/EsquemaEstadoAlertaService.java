@@ -13,15 +13,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Mantiene el CHECK de {@code estado_alerta} al día con {@link EstadoAlerta}.
- *
- * Hibernate crea ese CHECK con los valores del enum cuando crea la tabla, pero
- * {@code ddl-auto=update} nunca lo modifica: al añadir RESUELTA la base seguía
- * rechazándola y cerrar una infracción daba 500. Va en su propio runner, fuera
- * de la transacción de DatabaseInitializerService, para que un fallo de DDL no
- * aborte la siembra de datos.
- */
 @Service
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class EsquemaEstadoAlertaService implements CommandLineRunner {
@@ -59,7 +50,6 @@ public class EsquemaEstadoAlertaService implements CommandLineRunner {
             return;
         }
 
-        // Los valores vienen del enum, no de entrada de usuario.
         String valores = Arrays.stream(EstadoAlerta.values())
                 .map(e -> "'" + e.name() + "'")
                 .collect(Collectors.joining(", "));

@@ -9,18 +9,6 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Último frame anotado producido por el motor de visión.
- *
- * Existe para que la vista de cámara pueda mostrar el video con los recuadros
- * de gravedad SIN abrir la webcam del navegador. Eso resuelve un conflicto real:
- * la webcam sólo puede estar en un proceso a la vez, y si la ocupa el navegador
- * el motor de YOLOv8 se queda sin señal (y viceversa). Al ser el motor el
- * propietario de la cámara, él publica el resultado ya dibujado y el navegador
- * sólo lo pinta.
- *
- * Se guarda un único frame en memoria, no un histórico: es la imagen actual.
- */
 @Service
 public class VisionMarcoService {
 

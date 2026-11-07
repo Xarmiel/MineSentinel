@@ -1,19 +1,3 @@
-"""
-MineSentinel — Cliente de Integración de Visión por Computadora (YOLOv8 + ByteTrack)
-=====================================================================================
-Captura video en tiempo real (cámara web, stream RTSP de mina o video local), rastrea
-al personal con ByteTrack, evalúa el cumplimiento de EPP con YOLOv8 y reporta al backend
-Spring Boot los cruces de aforo, las faltas de EPP y los instrumentos no aptos.
-
-Modos de ejecución:
-  python yolo_sentinel_client.py --mode webcam --src 0
-  python yolo_sentinel_client.py --mode video --src video_mina.mp4
-  python yolo_sentinel_client.py --mode image --src foto_control.jpg
-  python yolo_sentinel_client.py --mode simulation            (demo sin cámara)
-
-Las reglas de cumplimiento por rol y el vocabulario de clases viven en
-`epp_config.yaml`; la lógica de detección en `epp_detector.py`.
-"""
 
 import argparse
 import io
@@ -42,19 +26,16 @@ logging.basicConfig(
 logger = logging.getLogger("MineSentinelClient")
 
 BACKEND_URL_DEFAULT = "http://localhost:8080"
+API_KEY_HEADERS = {"X-API-Key": os.environ["MINESENTINEL_API_KEY"]} if os.environ.get("MINESENTINEL_API_KEY") else {}
 CONFIG_DEFAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "epp_config.yaml")
 
 
 class CatalogoResolver:
-    """Resuelve nombres de EPP/anomalías del YAML a los ids de la base de datos.
-
-    Así `epp_config.yaml` nunca depende de ids hardcodeados: si el catálogo del
-    backend cambia, el cliente sigue funcionando.
-    """
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
+        self.session.headers.update(API_KEY_HEADERS)
         self.epp_por_nombre: Dict[str, int] = {}
         self.anomalias_por_nombre: Dict[str, int] = {}
 
@@ -97,16 +78,13 @@ class MineSentinelClient:
     def __init__(self, base_url: str = BACKEND_URL_DEFAULT, catalogo: Optional[CatalogoResolver] = None):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
+        self.session.headers.update(API_KEY_HEADERS)
         self.catalogo = catalogo or CatalogoResolver(self.base_url)
         self.track_counter = 100
-        # Último frame pendiente del stream MJPEG; el hilo emisor arranca con el primero.
         self._stream_cond = threading.Condition()
         self._stream_frame: Optional[bytes] = None
         self._stream_hilo: Optional[threading.Thread] = None
 
-    # =========================================================================
-    # CONEXIÓN
-    # =========================================================================
 
     def verificar_conexion(self) -> bool:
         try:
@@ -122,12 +100,8 @@ class MineSentinelClient:
             logger.error("No se pudo conectar a %s: %s", self.base_url, e)
             return False
 
-    # =========================================================================
-    # EVIDENCIAS
-    # =========================================================================
 
     def subir_evidencia(self, imagen_bgr, nombre: str = "evidencia_epp.jpg") -> str:
-        """Codifica un frame anotado (numpy BGR) y lo sube como evidencia."""
         try:
             import cv2
 
@@ -151,7 +125,6 @@ class MineSentinelClient:
         return ""
 
     def subir_snapshot_simulado(self, infraccion_texto: str) -> str:
-        """Crea una imagen sintética en memoria y la sube al backend."""
         try:
             try:
                 from PIL import Image, ImageDraw
@@ -177,12 +150,8 @@ class MineSentinelClient:
             logger.debug(f"Aviso en subida de snapshot: {e}")
         return ""
 
-    # =========================================================================
-    # AFORO
-    # =========================================================================
 
     def enviar_movimiento_aforo(self, tipo_movimiento: str, track_id: int, rol_id: int = 1) -> bool:
-        """Registra un cruce de línea virtual en el Event Ledger."""
         payload = {"tipoMovimiento": tipo_movimiento, "trackId": track_id, "rolId": rol_id}
         try:
             res = self.session.post(f"{self.base_url}/api/v1/aforo/movimiento", json=payload, timeout=5)
@@ -196,19 +165,10 @@ class MineSentinelClient:
             logger.error("Fallo en envío de movimiento: %s", e)
         return False
 
-    # =========================================================================
-    # SEGURIDAD
-    # =========================================================================
 
     def enviar_infraccion(self, epp_id: Optional[int], rol_id: int, confianza: float,
                           snapshot_url: str, tipo_infraccion: str = "FALTANTE",
                           descripcion: str = "", track_id: Optional[int] = None) -> Optional[int]:
-        """Registra una infracción de EPP (FALTANTE o IMPOSTOR) detectada por YOLOv8.
-
-        Devuelve el `faltaId` con el que el backend la archivó, o None si no se
-        pudo registrar. Ese id es lo que permite cerrarla después con
-        `resolver_infraccion` cuando el trabajador vuelve a portar el EPP.
-        """
         if epp_id is None:
             logger.warning("Infracción de tipo %s descartada: el elemento '%s' no existe en "
                            "el catálogo del backend", tipo_infraccion, descripcion)
@@ -240,11 +200,6 @@ class MineSentinelClient:
 
     def resolver_infraccion(self, falta_id: int, track_id: Optional[int] = None,
                             motivo: str = "EPP repuesto", snapshot_url: str = "") -> bool:
-        """Cierra una infracción abierta: el trabajador volvió a portar el EPP.
-
-        El backend la pasa a RESUELTA y el panel admin la recibe por SSE, de modo
-        que la alerta se marca cerrada sola, sin intervención humana.
-        """
         if not falta_id:
             return False
 
@@ -267,12 +222,6 @@ class MineSentinelClient:
         return False
 
     def enviar_cuadro(self, cuadro: dict) -> bool:
-        """Publica el cuadro de cumplimiento en vivo de la vista de cámara.
-
-        No es una alerta: es estado de pantalla. El backend lo mantiene unos
-        segundos y lo reemite por SSE, de modo que un supervisor que abre la
-        vista tarde ve el estado actual y no un histórico.
-        """
         try:
             res = self.session.post(f"{self.base_url}/api/v1/vision/cuadro", json=cuadro, timeout=5)
             if res.status_code in (200, 201, 202, 204):
@@ -283,12 +232,6 @@ class MineSentinelClient:
         return False
 
     def enviar_frame(self, jpeg: bytes) -> bool:
-        """Sube el frame ya anotado para que /camara muestre el video del motor.
-
-        Se envía crudo como image/jpeg en lugar de multipart: no hay metadatos
-        que adjuntar y así se evita el parseo de multipart del lado Spring, que
-        para un POST cada pocas décimas de segundo es trabajo inútil.
-        """
         try:
             res = self.session.post(
                 f"{self.base_url}/api/v1/vision/frame",
@@ -304,12 +247,6 @@ class MineSentinelClient:
         return False
 
     def publicar_stream(self, jpeg: bytes) -> None:
-        """Entrega un frame al hilo que alimenta el MJPEG de /camara.
-
-        No bloquea: si la red va lenta se pisa el frame pendiente en vez de
-        encolarlo, porque al panel sólo le interesa el presente y la detección
-        no debe esperar a la red.
-        """
         with self._stream_cond:
             self._stream_frame = jpeg
             self._stream_cond.notify()
@@ -323,21 +260,18 @@ class MineSentinelClient:
                 while self._stream_frame is None:
                     self._stream_cond.wait()
                 jpeg, self._stream_frame = self._stream_frame, None
-            # Formato de VisionStreamService.recibir: longitud big-endian de 4 bytes + JPEG.
             yield struct.pack(">I", len(jpeg)) + jpeg
 
     def _bucle_stream(self) -> None:
-        """Mantiene UNA petición POST abierta (chunked) y la reabre si se corta."""
         while True:
             try:
                 requests.post(f"{self.base_url}/api/v1/vision/stream", data=self._frames_stream(),
-                              headers={"Content-Type": "application/octet-stream"}, timeout=(5, None))
+                              headers={"Content-Type": "application/octet-stream", **API_KEY_HEADERS}, timeout=(5, None))
             except Exception as e:
                 logger.warning("Stream de video cortado (%s); reintentando", e)
             time.sleep(1)
 
     def enviar_falta_epp(self, epp_id: int, rol_id: int, confianza: float, snapshot_url: str) -> bool:
-        """Atajo retrocompatible: registra una falta de EPP sin tipo explícito."""
         return self.enviar_infraccion(epp_id, rol_id, confianza, snapshot_url, "FALTANTE", "")
 
     def enviar_anomalia(self, catalogo_anomalia_id: Optional[int], rol_id: int,
@@ -361,18 +295,8 @@ class MineSentinelClient:
             logger.error("Fallo en envío de anomalía: %s", e)
         return False
 
-    # =========================================================================
-    # MODO SIMULACIÓN (demo sin cámara)
-    # =========================================================================
 
     def publicar_cuadro_simulacion(self) -> None:
-        """Deja constancia en /camara de que no hay motor de visión real.
-
-        La simulación no ejecuta YOLOv8 ni captura vídeo, así que nunca publica
-        un frame. Sin este cuadro vacío marcado, la vista se queda en
-        "Esperando detections del motor YOLOv8…" y es indistinguible de un
-        detector que funciona pero no ve a nadie.
-        """
         self.enviar_cuadro({
             "rolId": 0,
             "nombreRol": "SIMULACIÓN",
@@ -383,7 +307,6 @@ class MineSentinelClient:
         })
 
     def ejecutar_simulacion(self, intervalo_segundos: float = 4.0):
-        """Simulación realista de operaciones en mina para demostraciones."""
         logger.info("Iniciando modo de simulación industrial continua (Ctrl+C para detener)...")
         logger.warning("MODO SIMULACIÓN: no se ejecuta YOLOv8 ni se captura vídeo. "
                        "La vista /camara NO mostrará detecciones reales ni recuadros. "
@@ -429,7 +352,6 @@ class MineSentinelClient:
 
 
 class PipelineEPP:
-    """Bucle de captura: analiza cada frame y reporta al backend lo detectado."""
 
     LADO_ARRIBA = "ARRIBA"
     LADO_ABAJO = "ABAJO"
@@ -444,33 +366,23 @@ class PipelineEPP:
         self.mostrar = mostrar
         self.dry_run = dry_run
         self.backend_camara = backend_camara
-        # Ejecutor de las llamadas que tocan la base de datos. Sólo existe dentro de
-        # procesar_fuente(); fuera de él (pruebas, imagen única) todo corre en línea.
         self._fondo: Optional[ThreadPoolExecutor] = None
         self.lado_por_track: Dict[int, str] = {}
         self.total_movimientos = 0
         self.total_infracciones = 0
         self.total_resueltas = 0
 
-        # --- Tracker de episodios de EPP (ciclo de vida de la alerta) ---
-        # Cada infracción de EPP es un "episodio" que se ABRÍ (crea la alerta en
-        # el panel) cuando el trabajador pasa a incumplir y se CIERRA (la marca
-        # RESUELTA) cuando vuelve a portar el EPP. Se gobierna por las
-        # transiciones del `estado_actual`, no por el enfriamiento, para que el
-        # panel de admin refleje al instante quién se quitó y quién se repuso.
-        self._abiertas: Dict[tuple, int] = {}      # (track, clave, tipo) -> faltaId
-        self._cuenta_abrir: Dict[tuple, int] = {}  # frames consecutivos con falta
-        self._cuenta_cerrar: Dict[tuple, int] = {}  # frames consecutivos sin falta
-        self._primer_avistamiento: Dict[int, float] = {}  # track_id -> timestamp primer frame
-        self._historial_confianzas: Dict[tuple, List[float]] = {}  # (track, clave, tipo) -> [confianzas]
+        self._abiertas: Dict[tuple, int] = {}
+        self._cuenta_abrir: Dict[tuple, int] = {}
+        self._cuenta_cerrar: Dict[tuple, int] = {}
+        self._primer_avistamiento: Dict[int, float] = {}
+        self._historial_confianzas: Dict[tuple, List[float]] = {}
         self.segundos_evaluacion = float(getattr(detector, 'segundos_evaluacion', 0.0))
         self.frames_abrir = max(1, int(getattr(detector, "frames_abrir", 3)))
         self.frames_cerrar = max(1, int(getattr(detector, "frames_cerrar", 8)))
 
-    # -------------------------------------------------------------------------
 
     def _cruces_de_linea(self, analisis, alto_frame: int) -> None:
-        """Detecta el cruce de la línea virtual por el punto de apoyo de cada persona."""
         for persona in analisis.personas:
             y = persona.caja.pie[1] / max(1, alto_frame)
             lado = self.LADO_ABAJO if y >= self.linea else self.LADO_ARRIBA
@@ -491,17 +403,6 @@ class PipelineEPP:
                 del self.lado_por_track[track_id]
 
     def _reportar_infracciones(self, analisis, incluir_epp: bool = True) -> None:
-        """Reporta las infracciones NUEVAS de este frame (ya con enfriamiento).
-
-        En los bucles en vivo `incluir_epp=False`: ahí el EPP se reporta por el
-        tracker de episodios (`_sincronizar_episodios`), que gobierna el ciclo
-        de vida completo (apertura y cierre). Así no se duplica la alerta. Sólo
-        las anomalías de movimiento siguen pasando por aquí (camino por
-        enfriamiento, sin resolución automática). La imagen única usa el camino
-        completo porque es un análisis de un solo frame sin ciclo de vida.
-        """
-        # Sólo lo que de verdad se envía: antes se subía un snapshot por cada frame con
-        # faltas de EPP aunque en vivo esas faltas no se reporten por aquí.
         enviar = [i for i in analisis.infracciones if i.es_anomalia or incluir_epp]
         if not enviar:
             return
@@ -533,18 +434,8 @@ class PipelineEPP:
                     infraccion.tipo, infraccion.descripcion, infraccion.track_id,
                 )
 
-    # -------------------------------------------------------------------------
-    # LLAMADAS AL BACKEND FUERA DEL BUCLE DE VIDEO
-    # -------------------------------------------------------------------------
 
     def _en_fondo(self, tarea, *args) -> Future:
-        """Ejecuta una llamada al backend sin frenar el video.
-
-        Cada alta en Supabase tarda cientos de ms; hechas en el bucle congelaban
-        el video segundos cuando entraba una persona con varias faltas. Un único
-        hilo las procesa en orden, así un cierre nunca adelanta a su apertura.
-        Sin ejecutor corre en línea y devuelve un Future ya resuelto.
-        """
         if self._fondo is None:
             futuro = Future()
             futuro.set_result(self._tarea_segura(tarea, *args))
@@ -553,7 +444,6 @@ class PipelineEPP:
 
     @staticmethod
     def _tarea_segura(tarea, *args):
-        # En un hilo de fondo una excepción se perdería en silencio dentro del Future.
         try:
             return tarea(*args)
         except Exception:
@@ -562,7 +452,6 @@ class PipelineEPP:
 
     @staticmethod
     def _copia_imagen(analisis):
-        # El envío ocurre más tarde, en otro hilo: se congela la imagen de este frame.
         imagen = analisis.imagen_anotada
         return None if imagen is None else imagen.copy()
 
@@ -577,54 +466,31 @@ class PipelineEPP:
         )
 
     def _cerrar_episodio(self, apertura: Future, track_id: int) -> None:
-        # La apertura ya terminó: va antes en la misma cola de un solo hilo.
         falta_id = apertura.result()
         if falta_id:
             self.cliente.resolver_infraccion(falta_id, track_id=track_id,
                                              motivo="EPP repuesto por el trabajador")
 
     def _descartar_si_fallo(self, key, apertura: Future) -> None:
-        # Si el alta falló no hay alerta que cerrar: se suelta la clave para reintentar.
         if not apertura.result() and self._abiertas.get(key) is apertura:
             self._abiertas.pop(key, None)
 
-    # -------------------------------------------------------------------------
-    # CICLO DE VIDA DE LA INFRACCIÓN (apertura y cierre de episodio)
-    # -------------------------------------------------------------------------
 
     def _sincronizar_episodios(self, analisis) -> None:
-        """Abre y cierra episodios de infracción de EPP según las transiciones.
-
-        Un "episodio" es la falta continua de un mismo (track, elemento, tipo).
-        Se ABRE cuando el trabajador pasa a incumplir de forma sostenida (N
-        frames) y se CIERRA cuando vuelve a portar el EPP (otros N frames sin
-        falta). Gobierna el ciclo de vida de la alerta en el panel de admin:
-        la crea al quitarse el EPP y la marca RESUELTA al ponérselo.
-
-        A propósito NO cierra cuando el track desaparece de cámara: si el
-        trabajador salió del encuadre aún sin EPP, no podemos afirmar que se
-        repuso, así que la alerta queda abierta para revisión humana.
-        """
         TRACK_SIN_ASIGNAR = -1
 
-        # Claves que este frame marcan como INCUMPLIMIENTO vigente (sólo EPP
-        # real: FALTANTE/IMPOSTOR con track asignado; las anomalías de
-        # movimiento siguen su propio camino por enfriamiento).
         incumpliendo = {}
         for i in analisis.estado_actual:
             if i.es_anomalia or i.track_id is None or i.track_id == TRACK_SIN_ASIGNAR:
                 continue
             incumpliendo[(i.track_id, i.clave, i.tipo)] = i
 
-        # --- Cierre: claves abiertas que dejaron de incumplir -----------------
         for key, falta_id in list(self._abiertas.items()):
             track_id = key[0]
             if key in incumpliendo:
-                # Sigue sin EPP: se reinicia el contador de cierre.
                 self._cuenta_cerrar.pop(key, None)
                 continue
             if track_id not in {p.track_id for p in analisis.personas}:
-                # El trabajador salió de cámara: no se cierra solo.
                 self._cuenta_cerrar.pop(key, None)
                 continue
 
@@ -640,27 +506,21 @@ class PipelineEPP:
             else:
                 self._cuenta_cerrar[key] = cierre
 
-        # --- Registro de tiempo y agregación de confianzas por track ---------
         ahora = time.time()
         personas_visibles = {p.track_id for p in analisis.personas}
         for tid in personas_visibles:
             if tid not in self._primer_avistamiento:
                 self._primer_avistamiento[tid] = ahora
 
-        # Acumular confianzas por frame para el promedio
         for key, infraccion in incumpliendo.items():
             self._historial_confianzas.setdefault(key, []).append(float(infraccion.confianza))
 
-        # --- Apertura: claves incumpliendo que aún no tienen episodio ---------
         for key, infraccion in incumpliendo.items():
             if key in self._abiertas:
-                continue  # ya hay un episodio abierto para esta falta
+                continue
 
             track_id = key[0]
             tiempo_visible = ahora - self._primer_avistamiento.get(track_id, ahora)
-            # Estrategia Híbrida: si aún no alcanza los segundos_evaluacion (5s), se espera
-            # a acumular historial estable, a menos que el frame supere el umbral frames_abrir
-            # y ya haya transcurrido el tiempo mínimo.
             if tiempo_visible < self.segundos_evaluacion:
                 continue
 
@@ -672,7 +532,6 @@ class PipelineEPP:
             self._cuenta_abrir.pop(key, None)
             self.total_infracciones += 1
 
-            # Calcular el promedio de confianza real registrado durante la ventana
             confianzas = self._historial_confianzas.get(key, [infraccion.confianza])
             confianza_promedio = round(sum(confianzas) / max(1, len(confianzas)), 3)
 
@@ -681,16 +540,11 @@ class PipelineEPP:
                             key[0], infraccion.tipo, infraccion.descripcion, confianza_promedio, tiempo_visible)
                 continue
 
-            # Se guarda el Future, no el id: el alta corre en segundo plano y el
-            # cierre lo resuelve cuando le toca en la cola.
             apertura = self._en_fondo(self._abrir_episodio, self._copia_imagen(analisis),
                                       analisis.fotograma, infraccion, confianza_promedio)
             self._abiertas[key] = apertura
             apertura.add_done_callback(lambda f, k=key: self._descartar_si_fallo(k, f))
 
-        # Limpieza de contadores de claves que ya no aplican (ni abiertas ni
-        # incumpliendo): evita que un contador viejo dispare una apertura
-        # espuria si la misma combinación reaparece más tarde.
         for key in list(self._cuenta_abrir):
             if key not in incumpliendo and key not in self._abiertas:
                 self._cuenta_abrir.pop(key, None)
@@ -699,23 +553,18 @@ class PipelineEPP:
             if key in incumpliendo or key not in self._abiertas:
                 self._cuenta_cerrar.pop(key, None)
 
-        # Limpieza de tracks que ya salieron del rango de visión
         for tid in list(self._primer_avistamiento):
             if tid not in personas_visibles:
                 self._primer_avistamiento.pop(tid, None)
 
-    # -------------------------------------------------------------------------
 
     def _publicar_cuadro(self, analisis) -> None:
-        """Envía el cuadro de cumplimiento según el ritmo configurado en el detector."""
         intervalo = max(1, int(getattr(self.detector, "cuadro_intervalo", 10)))
         if analisis.fotograma % intervalo != 0:
             return
 
         cuadro = self.detector.construir_cuadro(analisis, rol_id=self.rol_id)
         if not cuadro.get("personas"):
-            # Sin personas no hay nada que pintar. Se envía igual un cuadro vacío
-            # para que la vista limpie los recuadros de quienes ya no están.
             cuadro["personas"] = []
 
         if self.dry_run:
@@ -729,13 +578,6 @@ class PipelineEPP:
         self._publicar_frame(analisis)
 
     def _publicar_frame(self, analisis) -> None:
-        """Sube el frame anotado al backend para que la vista /camara lo muestre.
-
-        Se reutiliza la misma cadencia que el cuadro en lugar de la suya propia:
-        el frame es más pesado que el JSON y mandarlo cada frame satura la red
-        sin aportar información, ya que entre una publicación y la siguiente la
-        imagen apenas cambia.
-        """
         if not getattr(self.detector, "cuadro_publicar_frame", False):
             return
         jpeg = self._codificar_frame(analisis)
@@ -743,7 +585,6 @@ class PipelineEPP:
             self.cliente.enviar_frame(jpeg)
 
     def _publicar_stream(self, analisis) -> None:
-        """Publica CADA frame en el MJPEG de /camara; el envío corre en otro hilo."""
         if self.dry_run or not getattr(self.detector, "cuadro_publicar_frame", False):
             return
         jpeg = self._codificar_frame(analisis)
@@ -751,7 +592,6 @@ class PipelineEPP:
             self.cliente.publicar_stream(jpeg)
 
     def _codificar_frame(self, analisis) -> Optional[bytes]:
-        """Imagen anotada reescalada a `ancho_maximo` y codificada a JPEG."""
         import cv2
 
         imagen = analisis.imagen_anotada
@@ -771,7 +611,6 @@ class PipelineEPP:
         return buffer.tobytes()
 
     def procesar_fuente(self, fuente) -> None:
-        """Lee la fuente de video frame a frame hasta agotarla o Ctrl+C."""
         import cv2
 
         processed = 0
@@ -803,7 +642,6 @@ class PipelineEPP:
         finally:
             if self.mostrar:
                 cv2.destroyAllWindows()
-            # Se espera a que salgan los reportes pendientes: son alertas reales.
             self._fondo.shutdown(wait=True)
             self._fondo = None
 
@@ -811,14 +649,6 @@ class PipelineEPP:
                     processed, self.total_movimientos, self.total_infracciones, self.total_resueltas)
 
     def _abrir_camara(self, cv2, indice: int):
-        """Abre la cámara probando backends, porque el que usa OpenCV por
-        defecto (MSMF/Media Foundation) falla en varios equipos con
-        'can't grab frame' aunque la cámara esté conectada y no ocupada.
-
-        DSHOW es DirectShow y es mucho más fiable en Windows. Se prueban en
-        orden y se cae al primero que devuelva un frame real, no sólo una
-        cámara 'abierta': MSMF freakily se abre y luego no entrega imagen.
-        """
         if self.backend_camara:
             backends = [self.backend_camara]
         else:
@@ -841,8 +671,6 @@ class PipelineEPP:
                            indice, nombres.get(backend, backend))
             cap.release()
 
-        # Último recurso: devolver el capturador por defecto para que el error
-        # lo emita el llamador con su mensaje habitual.
         return cv2.VideoCapture(indice)
 
     def ejecutar_webcam(self, indice: int) -> None:
@@ -851,7 +679,6 @@ class PipelineEPP:
         fuente = self._abrir_camara(cv2, indice)
         if not fuente.isOpened():
             raise RuntimeError(f"No se pudo abrir la cámara {indice}")
-        # Sin MJPG, OpenCV pide YUYV y muchas webcams sólo dan 10 fps a 720p en ese formato.
         fuente.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         fuente.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         fuente.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -892,7 +719,6 @@ class PipelineEPP:
 
 
 def main():
-    # La consola de Windows usa cp1252 y aborta al imprimir los símbolos del log.
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")

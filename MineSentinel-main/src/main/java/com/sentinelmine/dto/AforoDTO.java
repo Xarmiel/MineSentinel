@@ -1,8 +1,5 @@
 package com.sentinelmine.dto;
 
-/**
- * DTO para la visualización del estado de aforo en las vistas Thymeleaf (dashboard, panel-admin).
- */
 public class AforoDTO {
 
     private int actual;

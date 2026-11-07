@@ -4,18 +4,8 @@ import com.sentinelmine.entity.enums.TipoInfraccionEPP;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
-/**
- * Payload de una infracción de EPP emitida por el módulo de visión (YOLOv8).
- *
- * A diferencia de FaltaEPPRequestDTO, distingue dos situaciones:
- *   FALTANTE  el trabajador no porta un EPP que su rol exige.
- *   IMPOSTOR  porta un objeto no homologado que lo imita (gorra, gafas de sol,
- *             zapatillas). El eppId apunta entonces al elemento IMPOSTOR del
- *             catálogo, no al EPP real que falta.
- */
 public class FaltaEPPRequestDTO {
 
-    // Opcional: Si es nulo, el backend asocia automáticamente el evento de turno activo
     private Long eventoId;
 
     private Long rolId;
@@ -29,13 +19,10 @@ public class FaltaEPPRequestDTO {
     private String snapshotUrl;
     private LocalDateTime fechaHora;
 
-    // Opcional: track de ByteTrack que originó la detección
     private Integer trackId;
 
-    // Si es nulo se asume FALTANTE, manteniendo la compatibilidad con el cliente legacy
     private TipoInfraccionEPP tipoInfraccion;
 
-    // Texto explicativo generado por el motor de visión (evidencia en el snapshot)
     private String descripcion;
 
     public FaltaEPPRequestDTO() {

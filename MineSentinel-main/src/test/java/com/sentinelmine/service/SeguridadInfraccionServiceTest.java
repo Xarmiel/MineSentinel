@@ -185,9 +185,6 @@ class SeguridadInfraccionServiceTest {
         verify(faltaEPPRepository, times(1)).save(falta);
     }
 
-    // =========================================================================
-    // RESOLUCIÓN AUTOMÁTICA (el motor detecta que el trabajador se puso el EPP)
-    // =========================================================================
 
     @Test
     @DisplayName("Debe marcar la falta como RESUELTA y reemitir 'alerta-actualizada' al resolver")
@@ -238,9 +235,6 @@ class SeguridadInfraccionServiceTest {
         verify(faltaEPPRepository, never()).save(any(FaltaEPP.class));
     }
 
-    // =========================================================================
-    // INFRACCIONES DE TIPO IMPOSTOR (objetos no homologados que imitan al EPP)
-    // =========================================================================
 
     @Test
     @DisplayName("Debe registrar una infracción IMPOSTOR con trackId y descripción, sin alterar el estado PENDIENTE")
@@ -295,7 +289,6 @@ class SeguridadInfraccionServiceTest {
     @Test
     @DisplayName("Debe degradar a FALTANTE si el cliente reporta IMPOSTOR sobre un elemento CONFORME del catálogo")
     void testRegistrarInfraccionImpostorSobreEppConformeSeCorrige() {
-        // eppCasco es un elemento CONFORME: un impostor nunca debe quedar registrado como tal.
         FaltaEPPRequestDTO dto = new FaltaEPPRequestDTO(
                 20L, 1L, 1L, 0.97f, "/evidencias/error_clasificacion.jpg", LocalDateTime.now(),
                 12, TipoInfraccionEPP.IMPOSTOR, "Clasificación inconsistente del cliente"
@@ -332,7 +325,6 @@ class SeguridadInfraccionServiceTest {
     @Test
     @DisplayName("KPIs del turno: cumplimiento cuenta personas con falta sin entrada y toma el EPP más incumplido")
     void obtenerKpisTurnoActivo_calculaCumplimientoYEppMasIncumplido() {
-        // 4 entradas (1..4); faltas en 2 y en 5 (detectado sin cruzar la línea) -> 2 de 5 con falta = 60%
         when(movimientoAforoRepository.trackIdsConEntradaTurnoActivo()).thenReturn(List.of(1, 2, 3, 4));
         when(faltaEPPRepository.trackIdsConFaltaTurnoActivo()).thenReturn(List.of(2, 5));
         when(faltaEPPRepository.contarInfraccionesTurnoActivo()).thenReturn(7L);

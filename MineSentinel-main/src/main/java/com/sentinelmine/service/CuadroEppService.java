@@ -13,16 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Estado en vivo del cuadro de cumplimiento de EPP que se pinta en la vista de
- * cámara.
- *
- * Deliberadamente NO se persiste: es una foto del presente. Guardar cada cuadro
- * en base de datos produciría decenas de filas por minuto que nadie consulta
- * (el histórico con valor es el de las infracciones, en `faltas_epp`). Aquí sólo
- * se retiene el último cuadro, y se considera vencido si el motor deja de
- * publicar, para que la vista no muestre recuadros de gente que ya no está.
- */
 @Service
 public class CuadroEppService {
 
@@ -40,9 +30,6 @@ public class CuadroEppService {
         this.sseNotificationService = sseNotificationService;
     }
 
-    /**
-     * Registra el cuadro recibido y lo reemite a los clientes SSE.
-     */
     public void publicar(CuadroEPPRequestDTO cuadro) {
         this.ultimo = cuadro;
         this.publicado.set(Instant.now());
@@ -53,11 +40,6 @@ public class CuadroEppService {
         log.debug("Cuadro publicado: {} persona(s), rol {}", personas, cuadro.getNombreRol());
     }
 
-    /**
-     * Devuelve el último cuadro vigente, o un cuadro vacío si el motor dejó de
-     * publicar. Nunca devuelve datos rancios: es preferible limpiar la vista a
-     * mostrar a alguien que ya salió de cámara.
-     */
     public Map<String, Object> obtenerVigente() {
         CuadroEPPRequestDTO actual = this.ultimo;
         if (actual == null || expirado()) {

@@ -106,9 +106,6 @@
     </div>
 </main>
 <script>
-    // =====================================================================
-    // 1. AFORO (polling + SSE)
-    // =====================================================================
     async function refrescarAforo() {
         try {
             const resAforo = await fetch('/api/v1/aforo/dashboard');
@@ -168,9 +165,6 @@
         }
     }
 
-    // =====================================================================
-    // 2. ALERTAS RECIENTES (refresco client-side, incluye estado RESUELTA)
-    // =====================================================================
     const ETIQUETA_ESTADO = {
         PENDIENTE: 'Pendiente',
         NOTIFICADA: 'Notificada',
@@ -237,9 +231,6 @@
         }
     }
 
-    // =====================================================================
-    // 3. CUADRO DE CUMPLIMIENTO DE EPP EN VIVO (SSE cuadro-epp)
-    // =====================================================================
     const ETIQUETA = { CONFORME: 'CONFORME', INTERMEDIO: 'INTERMEDIO', CRITICO: 'CRÍTICO' };
     const ORDEN_ESTADO = { CRITICO: 0, INTERMEDIO: 1, CONFORME: 2 };
 
@@ -315,16 +306,12 @@
     }
 
     function conectarCuadro() {
-        // Estado inicial: si el motor ya publicó algo, se muestra sin esperar al SSE.
         fetch('/api/v1/vision/cuadro')
             .then(r => r.ok ? r.json() : null)
             .then(c => { if (c) pintarCuadro(c); })
             .catch(() => { });
     }
 
-    // =====================================================================
-    // 4. STREAM SSE ÚNICO (aforo, alertas y cuadro de EPP)
-    // =====================================================================
     if (!!window.EventSource) {
         const source = new EventSource('/api/v1/stream/eventos');
         source.addEventListener('aforo-update', () => refrescarAforo());

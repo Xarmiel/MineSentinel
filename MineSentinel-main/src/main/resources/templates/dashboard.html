@@ -297,7 +297,6 @@
         }
     }
 
-    // Suscripción en tiempo real vía Server-Sent Events (SSE)
     function iniciarStreamSSE() {
         if (!!window.EventSource) {
             const source = new EventSource('/api/v1/stream/eventos');

@@ -5,9 +5,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * 7. AnomaliasMovimiento: Registro de comportamientos anómalos o riesgosos detectados por el modelo de visión.
- */
 @Entity
 @Table(name = "anomalias_movimiento", indexes = {
     @Index(name = "idx_anomalias_evento", columnList = "evento_id"),

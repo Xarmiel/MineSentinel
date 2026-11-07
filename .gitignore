@@ -16,3 +16,7 @@ target/
 
 *.mp4
 uploads/
+
+# Mantenimiento: credenciales locales y logs de cron
+**/scripts/minesentinel.env
+**/logs/

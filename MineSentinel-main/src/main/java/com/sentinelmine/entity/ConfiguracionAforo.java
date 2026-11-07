@@ -5,10 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * Límites de aforo editables por el administrador. Fila única (id = 1): sin
- * ella rigen los valores de application.properties.
- */
 @Entity
 @Table(name = "configuracion_aforo")
 public class ConfiguracionAforo {

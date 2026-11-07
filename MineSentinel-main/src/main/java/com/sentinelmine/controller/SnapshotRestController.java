@@ -12,9 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
 
-/**
- * Controlador REST para subir y descargar snapshots de evidencias visuales.
- */
 @RestController
 @RequestMapping("/api/v1/evidencias")
 @CrossOrigin(origins = "*")

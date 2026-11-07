@@ -4,13 +4,8 @@ import com.sentinelmine.entity.enums.TipoMovimiento;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
-/**
- * Payload emitido por el servicio de visión artificial (ByteTrack) al registrar un cruce de línea.
- */
 public class MovimientoRequestDTO {
 
-    // Opcional: Si se omite, el sistema resuelve automáticamente el evento_id activo
-    // según el flujo operativo y el solapamiento de turnos (ENTRADA -> nuevo turno / SALIDA -> turno saliente)
     private Long eventoId;
 
     @NotNull(message = "El rolId es obligatorio")
@@ -19,7 +14,6 @@ public class MovimientoRequestDTO {
     @NotNull(message = "El tipo de movimiento (ENTRADA/SALIDA) es obligatorio")
     private TipoMovimiento tipoMovimiento;
 
-    // Opcional: identificador del track de ByteTrack que cruzó la línea virtual.
     private Integer trackId;
 
     private LocalDateTime fechaHora;

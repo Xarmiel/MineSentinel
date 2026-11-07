@@ -11,9 +11,6 @@ import java.awt.Desktop;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Servicio de apertura automática del navegador web al iniciar Spring Boot.
- */
 @Service
 public class BrowserLauncherService {
 
@@ -50,7 +47,6 @@ public class BrowserLauncherService {
     private void abrirNavegador(String url) {
         String os = System.getProperty("os.name", "").toLowerCase();
 
-        // 1. En Windows, ejecutar comando de sistema nativo (100% confiable)
         if (os.contains("win")) {
             try {
                 new ProcessBuilder("cmd", "/c", "start", url).start();
@@ -60,7 +56,6 @@ public class BrowserLauncherService {
             }
         }
 
-        // 2. Intento mediante Desktop API
         try {
             if (!java.awt.GraphicsEnvironment.isHeadless() &&
                 Desktop.isDesktopSupported() &&
@@ -71,7 +66,6 @@ public class BrowserLauncherService {
         } catch (Exception ignored) {
         }
 
-        // 3. Fallbacks alternativos
         try {
             if (os.contains("win")) {
                 new ProcessBuilder("powershell", "-Command", "Start-Process '" + url + "'").start();

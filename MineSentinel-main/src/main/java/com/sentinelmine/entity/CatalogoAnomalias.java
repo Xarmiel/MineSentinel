@@ -3,9 +3,6 @@ package com.sentinelmine.entity;
 import jakarta.persistence.*;
 import java.util.Objects;
 
-/**
- * 4. CatalogoAnomalias: Tipos de conductas u ocurrencias anómalas detectadas en el flujo de personal (e.g. Cruce en sentido contrario, Movimiento en zona prohibida, Aglomeración en boca-mina, Caída a nivel).
- */
 @Entity
 @Table(name = "catalogo_anomalias")
 public class CatalogoAnomalias {

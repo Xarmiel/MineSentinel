@@ -6,14 +6,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * 8. FaltasEPP: Detecciones de incumplimiento de Elementos de Protección Personal
- * (e.g. Ingreso a socavón sin barbiquejo, sin lámpara, o sin chaleco).
- *
- * Cubre los dos casos que reporta el motor de visión: `FALTANTE` (no porta el EPP
- * que su rol exige) e `IMPOSTOR` (porta un objeto no homologado que lo imita).
- * `trackId` permite reconstruir qué trabajador[y qué frame] originó la alerta.
- */
 @Entity
 @Table(name = "faltas_epp", indexes = {
     @Index(name = "idx_faltas_epp_evento", columnList = "evento_id"),

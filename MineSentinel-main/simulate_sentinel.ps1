@@ -16,6 +16,8 @@ param (
 
 $BackendUrl = $BackendUrl.TrimEnd('/')
 $TrackId = 100
+$ApiHeaders = @{}
+if ($env:MINESENTINEL_API_KEY) { $ApiHeaders["X-API-Key"] = $env:MINESENTINEL_API_KEY }
 
 Write-Host "===============================================================" -ForegroundColor Cyan
 Write-Host "🛡️  MINESENTINEL — SIMULADOR NATIVO DE VISIÓN (POWERSHELL)" -ForegroundColor Yellow
@@ -27,7 +29,7 @@ Write-Host ""
 
 # Verificar si el backend está activo
 try {
-    $resTest = Invoke-RestMethod -Uri "$BackendUrl/api/v1/aforo/tiempo-real" -Method GET -TimeoutSec 3 -ErrorAction Stop
+    $resTest = Invoke-RestMethod -Headers $ApiHeaders -Uri "$BackendUrl/api/v1/aforo/tiempo-real" -Method GET -TimeoutSec 3 -ErrorAction Stop
     Write-Host "✅ Conectado a MineSentinel Backend!" -ForegroundColor Green
     Write-Host "   Aforo actual: $($resTest.aforoActual) / $($resTest.aforoMaximo) (Estado: $($resTest.estadoAforo))" -ForegroundColor Cyan
     Write-Host "   Turnos activos: $($resTest.cantidadTurnosActivos)" -ForegroundColor Cyan
@@ -70,7 +72,7 @@ while ($true) {
         } | ConvertTo-Json
 
         try {
-            $resEPP = Invoke-RestMethod -Uri "$BackendUrl/api/v1/seguridad/faltas-epp" -Method POST -Body $eppBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
+            $resEPP = Invoke-RestMethod -Headers $ApiHeaders -Uri "$BackendUrl/api/v1/seguridad/faltas-epp" -Method POST -Body $eppBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
             Write-Host "⚠️  [YOLOv8 EPP] Infracción detectada: Falta #$($resEPP.faltaId) (Confianza: $([int]($confianza*100))%) - $rolNombre" -ForegroundColor Red
         } catch {
             Write-Host "⚠️  Fallo al registrar alerta EPP: $($_.Exception.Message)" -ForegroundColor DarkRed
@@ -89,7 +91,7 @@ while ($true) {
         } | ConvertTo-Json
 
         try {
-            $resAnom = Invoke-RestMethod -Uri "$BackendUrl/api/v1/seguridad/anomalias" -Method POST -Body $anomBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
+            $resAnom = Invoke-RestMethod -Headers $ApiHeaders -Uri "$BackendUrl/api/v1/seguridad/anomalias" -Method POST -Body $anomBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
             Write-Host "🚨 [ANOMALÍA] Alerta de seguridad: ID #$($resAnom.anomaliaId) ($rolNombre)" -ForegroundColor Magenta
         } catch {
             Write-Host "🚨 Fallo al registrar anomalía: $($_.Exception.Message)" -ForegroundColor DarkRed
@@ -104,7 +106,7 @@ while ($true) {
     } | ConvertTo-Json
 
     try {
-        $resMov = Invoke-RestMethod -Uri "$BackendUrl/api/v1/aforo/movimiento" -Method POST -Body $movBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
+        $resMov = Invoke-RestMethod -Headers $ApiHeaders -Uri "$BackendUrl/api/v1/aforo/movimiento" -Method POST -Body $movBody -ContentType "application/json" -TimeoutSec 5 -ErrorAction Stop
         $color = if ($tipoMovimiento -eq "ENTRADA") { "Green" } else { "Cyan" }
         Write-Host "✅ [BYTETRACK] Cruce $tipoMovimiento registrado -> Movimiento #$($resMov.movimientoId) (Track #$TrackId) [$rolNombre]" -ForegroundColor $color
     } catch {

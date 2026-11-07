@@ -2,10 +2,6 @@ package com.sentinelmine.dto;
 
 import java.util.List;
 
-/**
- * Página de resultados del historial de alertas. Incluye los datos necesarios
- * para que la vista pueda navegar sin conocer detalles de la consulta SQL.
- */
 public class HistorialPagina {
 
     private final List<AlertaViewDTO> content;

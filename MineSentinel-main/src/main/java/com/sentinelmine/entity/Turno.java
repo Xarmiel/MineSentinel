@@ -4,9 +4,6 @@ import jakarta.persistence.*;
 import java.time.LocalTime;
 import java.util.Objects;
 
-/**
- * 2. Turnos: Definición horaria de los turnos base de operación minera (e.g. Turno Día 07:00-15:30, Turno Tarde 15:00-23:30).
- */
 @Entity
 @Table(name = "turnos")
 public class Turno {

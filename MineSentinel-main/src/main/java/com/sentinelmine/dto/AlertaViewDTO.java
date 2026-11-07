@@ -2,14 +2,10 @@ package com.sentinelmine.dto;
 
 import java.time.LocalDateTime;
 
-/**
- * DTO unificado para representar alertas (Faltas de EPP y Anomalías de Movimiento)
- * en las vistas Thymeleaf del dashboard, panel de administración e historial.
- */
 public class AlertaViewDTO {
 
     private Long id;
-    private String tipo; // "EPP" o "ANOMALIA"
+    private String tipo;
     private String tituloVisual;
     private String horaFormateada;
     private String descripcion;
@@ -18,12 +14,7 @@ public class AlertaViewDTO {
     private boolean prioridadAlta;
     private boolean notificadoJefeTurno;
     private String snapshotUrl;
-    // Estado crudo de la alerta (PENDIENTE, NOTIFICADA, REVISADA, DESCARTADA,
-    // RESUELTA) para que el panel admin pueda distinguir las que el motor ya
-    // cerró solo de las que siguen abiertas.
     private String estadoAlerta;
-    // Datos temporales y de trazabilidad que el historial necesita para no
-    // depender solo de la hora: fecha completa, track de ByteTrack y confianza.
     private LocalDateTime fechaHora;
     private String fechaFormateada;
     private Integer trackId;

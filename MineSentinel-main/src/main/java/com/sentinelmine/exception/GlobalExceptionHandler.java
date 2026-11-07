@@ -13,9 +13,6 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 
 import java.util.stream.Collectors;
 
-/**
- * Manejador centralizado de excepciones para controladores REST.
- */
 @RestControllerAdvice(basePackages = "com.sentinelmine.controller")
 public class GlobalExceptionHandler {
 
@@ -61,8 +58,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
-    // El navegador cerró una respuesta en streaming (p. ej. al salir de /camara):
-    // es el final normal del MJPEG, no un error que deba ensuciar el log.
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void handleClienteDesconectado(AsyncRequestNotUsableException ex, HttpServletRequest request) {
         log.debug("Cliente desconectado de {}: {}", request.getRequestURI(), ex.getMessage());

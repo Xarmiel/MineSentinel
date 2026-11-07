@@ -4,12 +4,6 @@ import com.sentinelmine.entity.enums.TipoCatalogoEPP;
 import jakarta.persistence.*;
 import java.util.Objects;
 
-/**
- * 3. CatalogoEPP: Elementos de Protección Personal monitoreados por YOLOv8 (e.g. Casco, Chaleco Reflectivo, Lámpara Minera, Barbiquejo, Botas).
- *
- * `tipo` distingue el EPP homologado (CONFORME) del objeto no apto que intenta
- * sustituirlo (IMPOSTOR: gorra, gafas de sol, zapatillas).
- */
 @Entity
 @Table(name = "catalogo_epp")
 public class CatalogoEPP {

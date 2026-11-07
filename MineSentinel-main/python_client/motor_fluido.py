@@ -1,25 +1,3 @@
-"""Motor de video e inference separados.
-
-El problema que resuelve: la camara entrega 30 fps, pero la inferencia de tres
-modelos en CPU se queda en 3-5 fps. Si un solo hilo hiciera ambas cosas, el
-video se veria a 3 fps, que es lo que hace que un panel de videovigilancia
-parezca congelado aunque el equipo no este haciendo nada mal.
-
-La solucion es separar los dos trabajos:
-
-  hilo VIDEO   lee la camara, pega el ultimo analisis conocido, codifica a JPEG
-               y lo envia por el stream. Va a la velocidad de la camara.
-  hilo IA      toma el frame mas reciente, corre los modelos y actualiza el
-               analisis. Va a la velocidad que permita la CPU.
-
-Cada recuadro refleja siempre el ultimo analisis completo, aunque el frame que
-se esta pintando sea mas nuevo. Esa desincronizacion de un instante es
-invisible a 3-5 fps de analisis y es el precio de que el video vaya fluido.
-
-El estado compartido es un unico objeto con un lock. No hace falta nada mas
-elaborado: la IA publica un analisis completo de forma atomica y el hilo de
-video lo lee entero, nunca a medias.
-"""
 
 import logging
 import threading
@@ -33,11 +11,6 @@ logger = logging.getLogger("minesentinel.motor")
 
 
 class EstadoCompartido:
-    """Ultimo analisis disponible para el hilo de video.
-
-    Se reemplaza entero, nunca se muta. Asi el hilo de video siempre ve un
-    analisis coherente aunque la IA este escribiendo en ese instante.
-    """
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -56,13 +29,11 @@ class EstadoCompartido:
             return self._frame, self._analisis, self._version
 
     def tomar_frame(self) -> Optional[np.ndarray]:
-        """Ultimo frame capturado, sin crear uno nuevo si no hay nada nuevo."""
         with self._lock:
             return self._frame
 
 
 class MotorDosHilos:
-    """Orquesta captura continua e inferencia sobre una fuente de video."""
 
     def __init__(self, detector, pipeline, fuente_factory, ancho_maximo: int = 960,
                  calidad_jpeg: int = 70, fps_objetivo: int = 30):
@@ -84,7 +55,6 @@ class MotorDosHilos:
         self._t0_ia = time.time()
         self.mostrar = False
 
-    # ---------------------------------------------------------------------
 
     def ejecutar(self) -> None:
         hilo_ia = threading.Thread(target=self._hilo_ia, name="ia", daemon=True)
@@ -99,16 +69,12 @@ class MotorDosHilos:
             logger.info("Motor cerrado | video %.1f fps | ia %.1f fps | %d frames capturados",
                         self.fps_video, self.fps_ia, self.frames_capturados)
 
-    # ---------------------------------------------------------------------
 
     def _hilo_video(self) -> None:
-        """Captura, anota con el ultimo analisis y publica. No detecta nada."""
         fuente = self.fuente_factory()
         if not fuente.isOpened():
             raise RuntimeError("No se pudo abrir la fuente de video")
 
-        # Limitar la espera entre frames: si la camara se atasca, no interesa
-        # acumular frames viejo en el buffer, interesa seguir intentando.
         if fuente.isOpened() and hasattr(fuente, "set"):
             fuente.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         try:
@@ -129,16 +95,10 @@ class MotorDosHilos:
             ahora = time.time()
 
             if ahora - ultimo_envio < intervalo:
-                # Faster que la camara: se descarta el frame en vez de enviarlo.
-                # Enviarlo solo produciria imagenes casi identicas y saturaria
-                # el stream sin que el ojo note diferencia.
                 self._mostrar_si_esta_activo(frame)
                 continue
             ultimo_envio = ahora
 
-            # Se dibuja el ultimo analisis disponible sobre el frame nuevo.
-            # Es la clave de la fluidez: el recuadro puede tener 200 ms, pero el
-            # fondo se mueve a 30 fps.
             imagen = self._anotar(frame)
             jpeg = self._codificar(imagen)
             if jpeg is not None and not self.pipeline.dry_run:
@@ -167,15 +127,12 @@ class MotorDosHilos:
             self.mostrar = False
 
     def _anotar(self, frame: np.ndarray) -> np.ndarray:
-        """Pega el ultimo analisis sobre el frame actual."""
         _, analisis, _ = self.estado.leer()
         if analisis is None:
-            # Todavia no hay analisis: se devuelve el frame limpio en vez de
-            # bloquear la espera del primer resultado de la IA.
             return frame
         try:
             return self.detector._anotar(frame, analisis, self.pipeline.linea)
-        except Exception as exc:  # pragma: no cover - defensivo
+        except Exception as exc:
             logger.debug("No se pudo anotar el frame: %s", exc)
             return frame
 
@@ -190,12 +147,8 @@ class MotorDosHilos:
             return None
         return buffer.tobytes()
 
-    # ---------------------------------------------------------------------
 
     def _hilo_ia(self) -> None:
-        """Corre los modelos sobre el frame mas reciente disponible."""
-        # Se espera al primer frame antes de arrancar: sin frame no hay nada que
-        # analizar y un intento solo gastaria CPU.
         while not self.detener.is_set() and self.estado.tomar_frame() is None:
             time.sleep(0.01)
 
@@ -216,7 +169,6 @@ class MotorDosHilos:
             self.frames_analizados += 1
             self.estado.publicar(frame, analisis)
 
-            # Todo lo que consume la IA se mantiene aqui, a su ritmo.
             self.pipeline._cruces_de_linea(analisis, frame.shape[0])
             self.pipeline._reportar_infracciones(analisis, incluir_epp=False)
             self.pipeline._sincronizar_episodios(analisis)

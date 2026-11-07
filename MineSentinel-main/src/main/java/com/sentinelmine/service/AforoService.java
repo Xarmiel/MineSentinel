@@ -24,10 +24,6 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * Servicio de aforo conectado a base de datos relacional PostgreSQL / Supabase.
- * Implementa el patrón Append-Only Event Ledger libre de cuellos de botella de concurrencia.
- */
 @Service
 public class AforoService {
 
@@ -40,8 +36,6 @@ public class AforoService {
 
     private final ConfiguracionAforoRepository configuracionAforoRepository;
 
-    // Valores por defecto de application.properties; los reemplaza la fila de
-    // configuracion_aforo si el administrador ya los cambió.
     @Value("${minesentinel.aforo.maximo:50}")
     private volatile int aforoMaximo;
 
@@ -70,7 +64,6 @@ public class AforoService {
                 aforoMinimo = c.getAforoMinimo();
             });
         } catch (Exception e) {
-            // Sin base de datos al arrancar se sigue con los valores por defecto.
             log.warn("No se pudieron cargar los límites de aforo guardados: {}", e.getMessage());
         }
     }
@@ -83,7 +76,6 @@ public class AforoService {
         return aforoMinimo;
     }
 
-    /** Cambia y persiste los límites de aforo (sólo el administrador). */
     @Transactional
     public void actualizarLimites(int maximo, int minimo) {
         if (maximo < 1 || minimo < 0 || minimo > maximo) {
@@ -94,10 +86,6 @@ public class AforoService {
         aforoMinimo = minimo;
     }
 
-    /**
-     * Registra el ingreso de un trabajador en tiempo real.
-     * Operación transaccional libre de bloqueos de exclusión mutua global.
-     */
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public boolean registrarIngreso(String codigoTrabajador, boolean eppCompleto) {
         if (!eppCompleto) {
@@ -124,9 +112,6 @@ public class AforoService {
         return true;
     }
 
-    /**
-     * Registra la salida de un trabajador en tiempo real.
-     */
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void registrarSalida() {
         int aforoActual = getAforoActual();
@@ -148,7 +133,6 @@ public class AforoService {
             movimientoAforoRepository.deleteAll();
             ultimoEvento = "Aforo reiniciado a 0 - Sin movimientos";
         } catch (Exception e) {
-            // Manejo defensivo
         }
     }
 

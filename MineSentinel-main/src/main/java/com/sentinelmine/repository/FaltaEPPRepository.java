@@ -36,8 +36,6 @@ public interface FaltaEPPRepository extends JpaRepository<FaltaEPP, Long> {
            "ORDER BY f.fechaHora DESC")
     List<FaltaEPP> findUltimasFaltas(Pageable pageable);
 
-    // Con open-in-view=false la entidad se serializa fuera de la sesión: sin
-    // JOIN FETCH, Jackson recibe proxies LAZY y la respuesta falla con 500.
     @Query("SELECT f FROM FaltaEPP f " +
            "JOIN FETCH f.epp " +
            "JOIN FETCH f.eventoTurno e " +
@@ -53,7 +51,6 @@ public interface FaltaEPPRepository extends JpaRepository<FaltaEPP, Long> {
            "ORDER BY f.fechaHora DESC")
     List<FaltaEPP> findByEstadoWithDetails(@Param("estado") EstadoAlerta estado);
 
-    // KPIs del turno: se excluyen las DESCARTADA porque son falsos positivos del modelo.
     @Query("SELECT COUNT(f) FROM FaltaEPP f " +
            "WHERE f.eventoTurno.estado = com.sentinelmine.entity.enums.EstadoTurno.ACTIVO " +
            "AND f.estadoAlerta <> com.sentinelmine.entity.enums.EstadoAlerta.DESCARTADA")

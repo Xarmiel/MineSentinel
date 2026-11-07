@@ -20,10 +20,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.UUID;
 
-/**
- * Servicio para la gestión y almacenamiento físico de evidencias visuales (Snapshots)
- * generadas por YOLOv8 o capturadas por el frontend.
- */
 @Service
 public class SnapshotStorageService {
 
@@ -41,9 +37,6 @@ public class SnapshotStorageService {
         }
     }
 
-    /**
-     * Guarda un archivo Multipart de imagen y devuelve la URL accesible.
-     */
     public String guardarSnapshot(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("El archivo de imagen no puede estar vacío");
@@ -65,9 +58,6 @@ public class SnapshotStorageService {
         return "/api/v1/evidencias/" + uniqueName;
     }
 
-    /**
-     * Guarda una imagen en formato Base64 (útil para streams de OpenCV / Webcams).
-     */
     public String guardarSnapshotBase64(String base64Data, String extension) throws IOException {
         if (base64Data == null || base64Data.isBlank()) {
             throw new IllegalArgumentException("La cadena base64 no puede estar vacía");
@@ -93,9 +83,6 @@ public class SnapshotStorageService {
         return "/api/v1/evidencias/" + uniqueName;
     }
 
-    /**
-     * Carga el archivo como recurso Spring para su descarga o visualización en el navegador.
-     */
     public Resource cargarComoRecurso(String filename) {
         try {
             Path filePath = this.rootLocation.resolve(filename).normalize();

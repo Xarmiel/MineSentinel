@@ -57,9 +57,6 @@ class EventoTurnoServiceTest {
         turnoTarde.setTurnoId(2L);
     }
 
-    // =========================================================================
-    // REQUERIMIENTO 1: GESTIÓN DE TURNOS SIMULTÁNEOS (SOLAPAMIENTO)
-    // =========================================================================
 
     @Test
     @DisplayName("Debe abrir un nuevo turno operativo en estado ACTIVO sin afectar turnos previos")
@@ -103,16 +100,13 @@ class EventoTurnoServiceTest {
         eventoTarde.setEventoId(102L);
         eventoTarde.setEstado(EstadoTurno.ACTIVO);
 
-        // Repositorio retorna ordenado por fechaInicio DESC (eventoTarde primero, eventoDia después)
         when(eventoTurnoRepository.findAllByEstadoWithTurno(EstadoTurno.ACTIVO))
                 .thenReturn(List.of(eventoTarde, eventoDia));
 
-        // 1. Ingreso de personal durante solapamiento -> pertenece a la guardia entrante (Guardia Tarde #102)
         EventoTurno paraEntrada = eventoTurnoService.resolverEventoActivoParaMovimiento(LocalDateTime.now(), TipoMovimiento.ENTRADA);
         assertEquals(102L, paraEntrada.getEventoId());
         assertEquals("Turno Guardia Tarde", paraEntrada.getTurno().getNombre());
 
-        // 2. Salida de personal durante solapamiento -> pertenece a la guardia saliente (Guardia Día #101)
         EventoTurno paraSalida = eventoTurnoService.resolverEventoActivoParaMovimiento(LocalDateTime.now(), TipoMovimiento.SALIDA);
         assertEquals(101L, paraSalida.getEventoId());
         assertEquals("Turno Guardia Día", paraSalida.getTurno().getNombre());
@@ -131,9 +125,6 @@ class EventoTurnoServiceTest {
         assertEquals("Solapamiento: Turno Guardia Tarde + Turno Guardia Día", eventoTurnoService.obtenerDescripcionTurnosActivos());
     }
 
-    // =========================================================================
-    // REQUERIMIENTO 2: CIERRE Y AUDITORÍA DE TURNO
-    // =========================================================================
 
     @Test
     @DisplayName("Debe cerrar turno consolidando únicamente movimientos con requiere_aforo = true")
@@ -146,7 +137,6 @@ class EventoTurnoServiceTest {
         when(eventoTurnoRepository.findByIdWithTurno(eventoId)).thenReturn(Optional.of(evento));
         when(cierreAuditoriaTurnoRepository.existsByEventoTurno_EventoId(eventoId)).thenReturn(false);
 
-        // Simulamos que el conteo con requiere_aforo=true da: 40 entradas, 38 salidas
         when(movimientoAforoRepository.countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(eventoId, TipoMovimiento.ENTRADA))
                 .thenReturn(40L);
         when(movimientoAforoRepository.countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(eventoId, TipoMovimiento.SALIDA))
@@ -160,25 +150,21 @@ class EventoTurnoServiceTest {
 
         CierreTurnoResponseDTO resultado = eventoTurnoService.cerrarTurno(eventoId);
 
-        // Validaciones del cierre
         assertNotNull(resultado);
         assertEquals(1001L, resultado.getAuditoriaId());
         assertEquals(eventoId, resultado.getEventoId());
         assertEquals("Turno Guardia Día", resultado.getNombreTurno());
         assertEquals(40, resultado.getTotalEntradas());
         assertEquals(38, resultado.getTotalSalidas());
-        assertEquals(2, resultado.getDiferencia()); // 2 personas remanentes
+        assertEquals(2, resultado.getDiferencia());
         assertTrue(resultado.getMensajeAuditoria().contains("Quedan 2 personas"));
 
-        // Validar que el estado del EventoTurno se actualizó a CERRADO y fechaFin no es nula
         assertEquals(EstadoTurno.CERRADO, evento.getEstado());
         assertNotNull(evento.getFechaFin());
 
-        // Validar persistencia atómica
         verify(cierreAuditoriaTurnoRepository, times(1)).save(any(CierreAuditoriaTurno.class));
         verify(eventoTurnoRepository, times(1)).save(evento);
 
-        // Validar que se llamó específicamente al método filtrado por requiere_aforo = true
         verify(movimientoAforoRepository, times(1))
                 .countByEventoTurno_EventoIdAndTipoMovimientoAndRol_RequiereAforoTrue(eventoId, TipoMovimiento.ENTRADA);
         verify(movimientoAforoRepository, times(1))
@@ -218,7 +204,7 @@ class EventoTurnoServiceTest {
         Long eventoId = 52L;
         EventoTurno evento = new EventoTurno(turnoDia, LocalDateTime.now().minusHours(8));
         evento.setEventoId(eventoId);
-        evento.setEstado(EstadoTurno.CERRADO); // Ya cerrado
+        evento.setEstado(EstadoTurno.CERRADO);
 
         when(eventoTurnoRepository.findByIdWithTurno(eventoId)).thenReturn(Optional.of(evento));
 

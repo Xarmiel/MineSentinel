@@ -27,10 +27,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Controlador REST para la integración con los módulos de visión por computador (YOLOv8 + ByteTrack)
- * y el consumo de métricas en tiempo real por el frontend/dashboard.
- */
 @RestController
 @RequestMapping("/api/v1")
 @CrossOrigin(origins = "*")
@@ -54,9 +50,6 @@ public class AforoRestController {
         this.alertaService = alertaService;
     }
 
-    // =========================================================================
-    // ENDPOINTS DE CONTROL DE AFORO (BYTE TRACK INGESTION)
-    // =========================================================================
 
     @PostMapping("/aforo/movimiento")
     public ResponseEntity<MovimientoAforo> registrarMovimiento(@Valid @RequestBody MovimientoRequestDTO request) {
@@ -76,9 +69,6 @@ public class AforoRestController {
         return ResponseEntity.ok(movimientoAforoService.obtenerUltimosMovimientos(limit));
     }
 
-    // =========================================================================
-    // ENDPOINTS DE GESTIÓN DE TURNOS (SOLAPAMIENTO Y AUDITORÍA)
-    // =========================================================================
 
     @PostMapping("/turnos/abrir")
     public ResponseEntity<EventoTurno> abrirTurno(
@@ -110,9 +100,6 @@ public class AforoRestController {
         return ResponseEntity.ok(eventoTurnoService.listarTurnosActivos());
     }
 
-    // =========================================================================
-    // ENDPOINTS DE ALERTAS Y SEGURIDAD (YOLOV8)
-    // =========================================================================
 
     @PostMapping("/seguridad/faltas-epp")
     public ResponseEntity<FaltaEPP> reportarFaltaEPP(@Valid @RequestBody FaltaEPPRequestDTO request) {
@@ -120,23 +107,12 @@ public class AforoRestController {
         return ResponseEntity.status(HttpStatus.CREATED).body(falta);
     }
 
-    /**
-     * Endpoint de ingesta del módulo de visión. Admite indistintamente faltas de EPP
-     * (FALTANTE) y elementos no aptos que se hacen pasar por EPP (IMPOSTOR: gorra,
-     * gafas de sol, calzado civil); la distinción viaja en `tipoInfraccion` y el
-     * `eppId` apunta al elemento correspondiente del catálogo.
-     */
     @PostMapping("/seguridad/infracciones")
     public ResponseEntity<FaltaEPP> reportarInfraccionEPP(@Valid @RequestBody FaltaEPPRequestDTO request) {
         FaltaEPP falta = seguridadInfraccionService.registrarFaltaEPP(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(falta);
     }
 
-    /**
-     * Cierre de ciclo de vida de una infracción: el motor de visión detectó que
-     * el trabajador volvió a portar el EPP que le faltaba. La falta pasa a
-     * RESUELTA y el panel admin la recibe por SSE vía `alerta-actualizada`.
-     */
     @PostMapping("/seguridad/infracciones/resolucion")
     public ResponseEntity<FaltaEPP> resolverInfraccionEPP(@Valid @RequestBody InfraccionResolucionRequestDTO request) {
         FaltaEPP falta = seguridadInfraccionService.resolverFaltaEPP(request);

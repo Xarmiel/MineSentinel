@@ -1,12 +1,5 @@
-/* ==========================================================================
-   MineSentinel · hoja de estilos
-   Diseno limpio y profesional: fondo claro, tarjetas blancas, acento ambar
-   sobrio (industrial). Estados semanticos en tonos pastel sobre fondo claro.
-   ========================================================================== */
 
 :root {
-    /* Gris/greige calido: baja el brillo del blanco puro para que la vista
-       descanse, pero se mantiene claro y limpio. */
     --bg: #d9d7d2;
     --surface: #ebe9e4;
     --surface-2: #e2e0da;
@@ -47,9 +40,6 @@ body {
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* --------------------------------------------------------------------------
-   Botones
-   -------------------------------------------------------------------------- */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -77,9 +67,6 @@ body {
 .btn-secondary:disabled { background: var(--neutral-soft); color: var(--text-muted); border-color: var(--border); cursor: default; }
 .btn-block { width: 100%; }
 
-/* --------------------------------------------------------------------------
-   Login
-   -------------------------------------------------------------------------- */
 .login-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
 .login-card {
     background: var(--surface);
@@ -121,9 +108,6 @@ body {
 .error { color: var(--danger-strong); font-size: .8rem; margin-top: .5rem; }
 .hint { margin-top: 1rem; font-size: .75rem; color: var(--text-muted); text-align: center; }
 
-/* --------------------------------------------------------------------------
-   Barra superior
-   -------------------------------------------------------------------------- */
 .topbar {
     display: flex;
     align-items: center;
@@ -162,19 +146,13 @@ body {
 .pill-warning { background: var(--warning-soft); color: var(--warning-strong); border-color: transparent; }
 .pill-success { background: var(--success-soft); color: var(--success-strong); border-color: transparent; }
 
-/* --------------------------------------------------------------------------
-   Layout
-   -------------------------------------------------------------------------- */
 .content { padding: 1.5rem; display: grid; grid-template-columns: 1.3fr 1fr; gap: 1.2rem; align-items: start; }
 .content-single { padding: 1.5rem; max-width: 760px; margin: 0 auto; display: block; }
-/* La vista de camara lleva el cuadro de EPP, que necesita ancho para que quepan
-   las columnas de EPP conforme / faltantes sin partirse en varias lineas. */
 .content-single:has(.cuadro-tabla) { max-width: 1180px; }
 
 .section-title { color: var(--text); font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
 .small { font-size: .78rem; color: var(--text-muted); }
 
-/* Utilidades de texto */
 .txt-critico { color: var(--danger-strong); }
 .txt-intermedio { color: var(--warning-strong); }
 .txt-conforme { color: var(--success-strong); }
@@ -183,9 +161,6 @@ body {
 .page-header .section-title { margin-bottom: 0; }
 .card-actions { margin-top: 1.25rem; display: flex; justify-content: flex-end; }
 
-/* --------------------------------------------------------------------------
-   Tarjetas
-   -------------------------------------------------------------------------- */
 .camera-card, .aforo-card, .alertas-card, .deteccion-panel {
     background: var(--surface);
     color: var(--text);
@@ -218,9 +193,6 @@ body {
 .badge-media { background: var(--warning-soft); color: var(--warning-strong); }
 .badge-alta { background: var(--danger-soft); color: var(--danger-strong); }
 
-/* --------------------------------------------------------------------------
-   Camara
-   -------------------------------------------------------------------------- */
 .camera-placeholder {
     position: absolute;
     inset: 0;
@@ -254,9 +226,6 @@ body {
 }
 .btn-camara { margin-top: .8rem; }
 
-/* --------------------------------------------------------------------------
-   Aforo
-   -------------------------------------------------------------------------- */
 .aforo-numbers { display: flex; justify-content: space-between; margin-bottom: .9rem; }
 .aforo-numbers div { text-align: center; }
 .num { display: block; font-size: 1.7rem; font-weight: 700; line-height: 1.1; color: var(--text); }
@@ -270,9 +239,6 @@ body {
 .progress-label { font-size: .72rem; color: var(--text-muted); margin-bottom: .85rem; }
 .ultimo-evento { font-size: .78rem; color: var(--text-soft); background: var(--surface-2); border: 1px solid var(--border); padding: .65rem .75rem; border-radius: var(--radius-sm); }
 
-/* --------------------------------------------------------------------------
-   Alertas
-   -------------------------------------------------------------------------- */
 .alerta {
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -282,9 +248,6 @@ body {
     margin-bottom: .75rem;
 }
 .alerta-alta { border-left-color: var(--danger); }
-/* Una alerta que el motor de visión cerró solo (el trabajador se repuso el EPP):
-   se atenúa para que no compita con las que siguen abiertas. El borde verde
-   dice "ya está", sin esconderla del histórico. */
 .alerta-resuelta { border-left-color: var(--success); opacity: .72; }
 .alerta-resuelta p { text-decoration: none; }
 .alerta-header { display: flex; justify-content: space-between; gap: .5rem; font-size: .85rem; margin-bottom: .3rem; }
@@ -298,9 +261,6 @@ body {
 .tag-pendiente { background: var(--neutral-soft); color: var(--text-muted); border-color: transparent; }
 .alerta .btn { width: 100%; }
 
-/* --------------------------------------------------------------------------
-   Panel de deteccion
-   -------------------------------------------------------------------------- */
 .deteccion-panel label { display: block; margin-top: .65rem; font-size: .8rem; font-weight: 600; color: var(--text-soft); }
 .deteccion-panel input[type="text"] {
     width: 100%;
@@ -319,11 +279,6 @@ body {
 .resultado-ok { color: var(--success-strong); }
 .resultado-fail { color: var(--danger-strong); }
 
-/* --------------------------------------------------------------------------
-   Cuadro de cumplimiento de EPP en vivo (vista de camara)
-   Los tres estados son los mismos que emite el motor: CONFORME verde,
-   INTERMEDIO naranja, CRITICO rojo.
-   -------------------------------------------------------------------------- */
 .cuadro-leyenda { display: flex; flex-wrap: wrap; align-items: center; gap: .9rem; margin: .85rem 0; font-size: .72rem; color: var(--text-muted); }
 .leyenda-item { display: inline-flex; align-items: center; gap: .35rem; }
 .leyenda-dot { width: .6rem; height: .6rem; border-radius: 50%; display: inline-block; }
@@ -354,8 +309,6 @@ body {
 .cuadro-tabla tbody tr:hover { background: var(--surface-2); }
 .cuadro-vacio td { text-align: center; color: var(--text-muted); padding: 1.2rem; font-style: italic; }
 .cuadro-conformes { color: var(--success-strong); }
-/* "3 / 4": el numerador va en claro y el total atenuado, para que la cifra que
-   decide si hay que acercarse se lea antes que el denominador. */
 .cuadro-progreso { white-space: nowrap; color: var(--text-muted); }
 .cuadro-progreso strong { color: var(--text); font-size: .85rem; }
 
@@ -365,9 +318,6 @@ body {
 .chip.critico { background: var(--danger-soft); color: var(--danger-strong); }
 .chip.ok { background: var(--neutral-soft); color: var(--text-muted); font-weight: 400; }
 
-/* --------------------------------------------------------------------------
-   Historial
-   -------------------------------------------------------------------------- */
 .content-single:has(.tabla-historial) { max-width: 1280px; }
 
 .filtros-historial {
@@ -427,9 +377,6 @@ body {
 .paginacion-controles { display: flex; gap: .5rem; }
 .btn.deshabilitado { pointer-events: none; opacity: .45; }
 
-/* --------------------------------------------------------------------------
-   Dashboard mejorado - KPIs, Personas en Riesgo
-   -------------------------------------------------------------------------- */
 .kpi-strip {
     grid-column: 1 / -1;
     display: grid;
@@ -635,9 +582,6 @@ body {
     font-style: italic;
 }
 
-/* --------------------------------------------------------------------------
-   Responsive
-   -------------------------------------------------------------------------- */
 @media (max-width: 1100px) {
     .kpi-strip { grid-template-columns: repeat(3, 1fr); }
     .dashboard-grid { grid-template-columns: 1fr 1fr; }

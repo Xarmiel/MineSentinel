@@ -8,11 +8,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-/**
- * Servicio de notificaciones externas hacia los supervisores y jefes de turno.
- * Permite la emisión de despachos de seguridad industrial mediante logs estructurados,
- * Webhooks o pasarelas de mensajería externa.
- */
 @Service
 public class NotificacionExternaService {
 
@@ -40,7 +35,6 @@ public class NotificacionExternaService {
 
         log.warn("\n=======================================================\n{}\n=======================================================", mensaje);
 
-        // Si se configuró una URL de Webhook externa (ej. Telegram Bot, Teams o Slack en mina)
         if (webhookUrl != null && !webhookUrl.isBlank()) {
             log.info("Despachando payload JSON hacia Webhook configurado: {}", webhookUrl);
         }

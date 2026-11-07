@@ -10,27 +10,11 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Difusión de video MJPEG entre el motor de visión y los navegadores.
- *
- * Existe por una razón concreta: una webcam sólo puede estar en un proceso a la
- * vez, y la IA consume CPU. Si el motor dedicara el hilo principal a detectar,
- * el video quedaría a 3-4 fps aunque la cámara pueda entregar 30. La solución
- * es que el motor separe ambos trabajos y publique aquí el resultado: el video
- * corre fluido y los recuadros de EPP se refrescan cada pocas décimas de
- * segundo, que es como funcionan los sistemas de videovigilancia con analítica.
- *
- * Se guarda un solo frame, no un búfer: a un suscriptor le interesa el presente.
- * Cada suscriptor corre en su propio hilo (Spring ejecuta cada
- * StreamingResponseBody en el pool asíncrono) y espera a que llegue el
- * siguiente, así que un cliente lento no frena al motor.
- */
 @Service
 public class VisionStreamService {
 
     private static final Logger log = LoggerFactory.getLogger(VisionStreamService.class);
 
-    /** Tamaño máximo admitido por frame. 8 MB cubre de sobra un JPEG 1080p. */
     private static final int MAX_FRAME = 8 * 1024 * 1024;
 
     private static final byte[] LIMITE = "--visionframe\r\n".getBytes();
@@ -43,9 +27,6 @@ public class VisionStreamService {
     private volatile byte[] ultimo;
     private volatile long recibidoEn;
 
-    /**
-     * Publica un frame para todos los suscriptores activos.
-     */
     public void publicar(byte[] jpeg) {
         if (jpeg == null || jpeg.length == 0) {
             return;
@@ -58,13 +39,6 @@ public class VisionStreamService {
         }
     }
 
-    /**
-     * Espera a que llegue un frame posterior al visto y lo devuelve.
-     *
-     * @param vistoSecuencia secuencia del último frame ya consumido
-     * @param timeoutMs      cuánto esperar antes de ceder el turno
-     * @return el frame nuevo, o null si venció el tiempo de espera
-     */
     public byte[] siguiente(long vistoSecuencia, long timeoutMs) throws InterruptedException {
         long limite = System.currentTimeMillis() + timeoutMs;
         synchronized (monitor) {
@@ -91,23 +65,7 @@ public class VisionStreamService {
         return this.recibidoEn == 0 ? -1 : System.currentTimeMillis() - this.recibidoEn;
     }
 
-    // -------------------------------------------------------------------------
-    // Ingesta: el motor abre UNA conexión y va escribiendo frames seguidos
-    // -------------------------------------------------------------------------
 
-    /**
-     * Lee un flujo de frames JPEG con prefijo de longitud y los va republicando.
-     *
-     * El formato es deliberadamente binario y simple: 4 bytes de longitud en
-     * big-endian seguidos de los bytes del JPEG. Se descartó multipart a
-     * propósito, porque multipart sólo se parsea bien con buffering completo y
-     * aquí el flujo no termina nunca; un prefijo de longitud se puede leer
-     * incrementalmente sin cargar nada en memoria más allá del frame en curso.
-     *
-     * El método ocupa el hilo de la petición mientras el motor publique y sale
-     * solo cuando el motor cierra la conexión, que es lo propio de un flujo
-     * largo y bloqueante.
-     */
     public void recibir(InputStream entrada) throws IOException {
         long recibidos = 0;
         long ultimoLog = System.currentTimeMillis();
@@ -143,10 +101,6 @@ public class VisionStreamService {
         }
     }
 
-    /**
-     * Escribe el stream multipart que un {@code <img>} del navegador consume
-     * directamente como video continuo.
-     */
     public void escribirMultipart(OutputStream salida, long timeoutMs) throws IOException {
         long visto = -1;
 
@@ -159,10 +113,6 @@ public class VisionStreamService {
                 return;
             }
             if (frame == null) {
-                // El motor no publica. Se corta la conexión para que el
-                // navegador la reintente: mantenerla abierta mostraría la
-                // última imagen congelada indefinidamente, que en un panel de
-                // seguridad es peor que un hueco visible.
                 return;
             }
             visto = secuencia.get();
@@ -176,7 +126,6 @@ public class VisionStreamService {
                 salida.write("\r\n".getBytes());
                 salida.flush();
             } catch (IOException e) {
-                // El navegador cerró /camara: es el final normal del stream, no un error.
                 log.debug("Suscriptor MJPEG desconectado: {}", e.getMessage());
                 return;
             }

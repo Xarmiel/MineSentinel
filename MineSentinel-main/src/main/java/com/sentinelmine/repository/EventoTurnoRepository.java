@@ -13,10 +13,6 @@ import java.util.Optional;
 @Repository
 public interface EventoTurnoRepository extends JpaRepository<EventoTurno, Long> {
 
-    /**
-     * Recupera todos los turnos con un estado específico.
-     * Soporta consultar múltiples turnos en estado 'ACTIVO' simultáneamente durante el solapamiento de turnos.
-     */
     @Query("SELECT e FROM EventoTurno e JOIN FETCH e.turno WHERE e.estado = :estado ORDER BY e.fechaInicio DESC")
     List<EventoTurno> findAllByEstadoWithTurno(@Param("estado") EstadoTurno estado);
 

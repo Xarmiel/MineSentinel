@@ -5,13 +5,6 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
-/**
- * 6. MovimientosAforo: Registros individuales de cruce de línea virtual (ENTRADA / SALIDA)
- * emitidos por el módulo de visión computacional y tracking (YOLOv8 + ByteTrack).
- * 
- * ARQUITECTURA: Diseñado bajo el patrón Append-Only Event Ledger para eliminar bloqueos de concurrencia
- * a nivel de fila durante ráfagas de paso de personal por boca-mina.
- */
 @Entity
 @Table(name = "movimientos_aforo", indexes = {
     @Index(name = "idx_movimientos_evento", columnList = "evento_id"),
@@ -40,7 +33,6 @@ public class MovimientoAforo {
     @Column(name = "fecha_hora", nullable = false)
     private LocalDateTime fechaHora;
 
-    /** Identificador del track de ByteTrack que originó el cruce. */
     @Column(name = "track_id")
     private Integer trackId;
 

@@ -66,7 +66,6 @@ public class PanelAdminController {
     public String actualizarLimitesAforo(@RequestParam int maximo,
                                          @RequestParam int minimo,
                                          RedirectAttributes flash) {
-        // El acceso sólo de administrador lo garantiza AuthInterceptor (/panel-admin/**).
         try {
             aforoService.actualizarLimites(maximo, minimo);
             flash.addFlashAttribute("mensajeAforo", "Límites de aforo actualizados: máximo " + maximo + ", mínimo " + minimo + ".");

@@ -21,10 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Servicio encargado de la ingestión y gestión de alertas de seguridad industrial
- * (Infracciones de EPP y Anomalías de Movimiento) detectadas por YOLOv8.
- */
 @Service
 public class SeguridadInfraccionService {
 
@@ -63,14 +59,6 @@ public class SeguridadInfraccionService {
         this.movimientoAforoRepository = movimientoAforoRepository;
     }
 
-    /**
-     * Registra una infracción de EPP detectada en tiempo real por YOLOv8.
-     *
-     * Admite los dos tipos de hallazgo del motor de visión:
-     *   FALTANTE  el trabajador no porta un EPP obligatorio de su rol.
-     *   IMPOSTOR  porta un objeto no homologado que lo imita (gorra, gafas de sol).
-     *              En ese caso el eppId apunta al elemento IMPOSTOR del catálogo.
-     */
     @Transactional
     public FaltaEPP registrarFaltaEPP(FaltaEPPRequestDTO dto) {
         LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
@@ -95,9 +83,6 @@ public class SeguridadInfraccionService {
                 ? dto.getTipoInfraccion()
                 : TipoInfraccionEPP.FALTANTE;
 
-        // Un hallazgo IMPOSTOR debe apuntar a un elemento marcado como IMPOSTOR en el
-        // catálogo (y viceversa). Si el cliente clasifica mal, se corrige en servidor
-        // para que el histórico no mezcle ambas situaciones.
         TipoCatalogoEPP tipoCatalogo = epp.getTipo() != null ? epp.getTipo() : TipoCatalogoEPP.CONFORME;
         if (tipo == TipoInfraccionEPP.IMPOSTOR && tipoCatalogo != TipoCatalogoEPP.IMPOSTOR) {
             log.warn("El cliente reportó IMPOSTOR sobre el EPP '{}' (CONFORME); se registra como FALTANTE", epp.getNombre());
@@ -129,9 +114,6 @@ public class SeguridadInfraccionService {
         return guardada;
     }
 
-    /**
-     * Registra una anomalía de desplazamiento o riesgo en boca-mina/interior detectada por visión.
-     */
     @Transactional
     public AnomaliaMovimiento registrarAnomalia(AnomaliaRequestDTO dto) {
         LocalDateTime fechaHora = dto.getFechaHora() != null ? dto.getFechaHora() : LocalDateTime.now();
@@ -174,9 +156,6 @@ public class SeguridadInfraccionService {
         return guardada;
     }
 
-    /**
-     * Actualiza el estado de una falta de EPP (e.g. marcar como NOTIFICADA o REVISADA).
-     */
     @Transactional
     public FaltaEPP cambiarEstadoFaltaEPP(Long faltaId, EstadoAlerta nuevoEstado) {
         FaltaEPP falta = faltaEPPRepository.findById(faltaId)
@@ -185,14 +164,6 @@ public class SeguridadInfraccionService {
         return faltaEPPRepository.save(falta);
     }
 
-    /**
-     * Cierra una infracción de EPP cuando el motor de visión detecta que el
-     * trabajador volvió a portar el elemento que le faltaba.
-     *
-     * Idempotente: si la falta ya está RESUELTA o DESCARTADA se devuelve tal
-     * cual sin reemitir el evento, para que los reintentos de red del cliente
-     * no dupliquen notificaciones en el panel.
-     */
     @Transactional
     public FaltaEPP resolverFaltaEPP(InfraccionResolucionRequestDTO dto) {
         FaltaEPP falta = faltaEPPRepository.findByIdWithDetails(dto.getFaltaId())
@@ -223,9 +194,6 @@ public class SeguridadInfraccionService {
         return guardada;
     }
 
-    /**
-     * Actualiza el estado de una anomalía detectada.
-     */
     @Transactional
     public AnomaliaMovimiento cambiarEstadoAnomalia(Long anomaliaId, EstadoAlerta nuevoEstado) {
         AnomaliaMovimiento anomalia = anomaliaMovimientoRepository.findById(anomaliaId)
@@ -239,10 +207,6 @@ public class SeguridadInfraccionService {
         return faltaEPPRepository.findUltimasFaltas(PageRequest.of(0, limit));
     }
 
-    /**
-     * Obtiene las infracciones más recientes filtrando por tipo, útil para auditar
-     * por separado los elementos no aptos (IMPOSTOR) de las faltas de EPP ordinarias.
-     */
     @Transactional(readOnly = true)
     public List<FaltaEPP> obtenerUltimasFaltasEPPPorTipo(TipoInfraccionEPP tipo, int limit) {
         return faltaEPPRepository.findByTipoInfraccion(PageRequest.of(0, limit), tipo);
@@ -253,17 +217,8 @@ public class SeguridadInfraccionService {
         return anomaliaMovimientoRepository.findUltimasAnomalias(PageRequest.of(0, limit));
     }
 
-    /**
-     * KPIs EPP de los turnos activos: tasa de cumplimiento, total de infracciones
-     * y el EPP más incumplido. Las DESCARTADA no cuentan (falsos positivos).
-     *
-     * Cumplimiento = 1 - (personas con falta / personas detectadas), donde las
-     * detectadas son los trackId que ingresaron más los que tuvieron falta sin
-     * cruzar la línea, para que la tasa nunca baje de 0%.
-     */
     @Transactional(readOnly = true)
     public Map<String, Object> obtenerKpisTurnoActivo() {
-        // shortcut: trackId identifica a la persona solo mientras ByteTrack no se reinicie; si el cliente Python se reinicia a mitad de turno, los IDs pueden repetirse.
         Set<Integer> conFalta = new HashSet<>(faltaEPPRepository.trackIdsConFaltaTurnoActivo());
         Set<Integer> detectadas = new HashSet<>(movimientoAforoRepository.trackIdsConEntradaTurnoActivo());
         detectadas.addAll(conFalta);

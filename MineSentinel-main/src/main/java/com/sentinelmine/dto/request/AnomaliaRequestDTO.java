@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 
 public class AnomaliaRequestDTO {
 
-    // Opcional: Si es nulo, el backend asocia automáticamente el evento de turno activo
     private Long eventoId;
 
     private Long rolId;

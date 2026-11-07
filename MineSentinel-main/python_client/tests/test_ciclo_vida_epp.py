@@ -1,19 +1,3 @@
-"""
-Pruebas del ciclo de vida de la infracción de EPP (tracker de episodios).
-========================================================================
-Sin red ni modelos: se ejecuta con la stdlib. Desde `python_client/`:
-
-    python -m unittest tests.test_ciclo_vida_epp -v
-
-No uses `unittest discover` sobre la raíz: `runs/` arrastra miles de artefactos
-de Ultralytics (ver tests/test_reglas_epp.py).
-
-Qué protegen: `_sincronizar_episodios` decide cuándo el panel de admin ve una
-alerta aparecer (apertura) y cuándo se marca RESUELTA sola (cierre). Si se
-rompe, el síntoma es un panel que no refleja quién se puso o se quitó el EPP:
-o llena de alertas que nunca se cierran, o cierra antes de tiempo y deja una
-falta abierta sin aviso. Ninguno de esos fallos lanza excepción.
-"""
 
 import os
 import sys
@@ -50,12 +34,11 @@ def _analisis(infracciones=None, personas=None):
 
 
 class _ClienteFalso:
-    """Captura las llamadas de apertura/cierre sin tocar la red."""
 
     def __init__(self, falta_id_base=100):
         self._siguiente = falta_id_base
-        self.infracciones_abiertas = []   # kwargs de enviar_infraccion
-        self.resueltas = []               # (falta_id, kwargs) de resolver_infraccion
+        self.infracciones_abiertas = []
+        self.resueltas = []
         self.catalogo = SimpleNamespace(epp_id=lambda nombre: 1)
 
     def enviar_infraccion(self, epp_id, rol_id, confianza, snapshot_url,
@@ -81,7 +64,6 @@ def _pipeline(frames_abrir=3, frames_cerrar=8, dry_run=False):
 
 
 class TestAperturaDeEpisodio(unittest.TestCase):
-    """La alerta no debe abrirse por un solo frame parpadeante."""
 
     def test_no_abre_en_el_primer_frame(self):
         p = _pipeline(frames_abrir=3)
@@ -97,11 +79,10 @@ class TestAperturaDeEpisodio(unittest.TestCase):
         self.assertEqual(len(p.cliente.infracciones_abiertas), 1)
 
     def test_no_abre_si_la_falta_parapadea(self):
-        # 2 frames con falta, 1 sin falta (resetea), 2 con falta: aún no abre.
         p = _pipeline(frames_abrir=3)
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
-        p._sincronizar_episodios(_analisis(infracciones=[]))   # resetea
+        p._sincronizar_episodios(_analisis(infracciones=[]))
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         self.assertEqual(p._abiertas, {})
@@ -111,7 +92,6 @@ class TestAperturaDeEpisodio(unittest.TestCase):
         for _ in range(2):
             p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         self.assertEqual(len(p.cliente.infracciones_abiertas), 1)
-        # Sigue incumpliendo: no debe abrir un segundo episodio.
         for _ in range(5):
             p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         self.assertEqual(len(p.cliente.infracciones_abiertas), 1)
@@ -125,7 +105,6 @@ class TestAperturaDeEpisodio(unittest.TestCase):
 
 
 class TestCierreDeEpisodio(unittest.TestCase):
-    """Ponerse el EPP debe resolver la alerta exactamente una vez."""
 
     def _abrir(self, pipeline, frames=3):
         for _ in range(frames):
@@ -135,9 +114,8 @@ class TestCierreDeEpisodio(unittest.TestCase):
     def test_resuelve_exactamente_una_vez_al_ponerse_el_epp(self):
         p = _pipeline(frames_abrir=3, frames_cerrar=3)
         self._abrir(p)
-        falta_id = next(iter(p._abiertas.values())).result()  # Future del alta
+        falta_id = next(iter(p._abiertas.values())).result()
 
-        # Los frames_cerrar frames conformes cierran el episodio.
         for _ in range(3):
             p._sincronizar_episodios(_analisis(infracciones=[]))
         self.assertEqual(len(p.cliente.resueltas), 1)
@@ -145,7 +123,6 @@ class TestCierreDeEpisodio(unittest.TestCase):
         self.assertEqual(p.cliente.resueltas[0][1]["track_id"], 7)
         self.assertEqual(p._abiertas, {})
 
-        # Frames conformes extra no deben resolver de nuevo.
         for _ in range(5):
             p._sincronizar_episodios(_analisis(infracciones=[]))
         self.assertEqual(len(p.cliente.resueltas), 1)
@@ -153,7 +130,7 @@ class TestCierreDeEpisodio(unittest.TestCase):
     def test_no_cierra_antes_de_frames_cerrar(self):
         p = _pipeline(frames_abrir=3, frames_cerrar=8)
         self._abrir(p)
-        for _ in range(7):   # un frame menos del umbral
+        for _ in range(7):
             p._sincronizar_episodios(_analisis(infracciones=[]))
         self.assertEqual(p.cliente.resueltas, [])
         self.assertEqual(len(p._abiertas), 1)
@@ -163,13 +140,11 @@ class TestCierreDeEpisodio(unittest.TestCase):
         self._abrir(p)
         p._sincronizar_episodios(_analisis(infracciones=[]))
         p._sincronizar_episodios(_analisis(infracciones=[]))
-        # Vuelve a incumplir antes del umbral: no cierra.
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         self.assertEqual(p.cliente.resueltas, [])
         self.assertEqual(len(p._abiertas), 1)
 
     def test_abre_un_episodio_nuevo_tras_resolver(self):
-        # Ciclo completo: sin casco -> casco -> sin casco otra vez.
         p = _pipeline(frames_abrir=2, frames_cerrar=2)
         for _ in range(2):
             p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
@@ -183,7 +158,6 @@ class TestCierreDeEpisodio(unittest.TestCase):
 
 
 class TestDesaparicionDeTrack(unittest.TestCase):
-    """Salir de cámara con falta abierta no debe cerrar solo."""
 
     def test_track_fuera_de_camara_no_cierra(self):
         p = _pipeline(frames_abrir=2, frames_cerrar=2)
@@ -191,7 +165,6 @@ class TestDesaparicionDeTrack(unittest.TestCase):
             p._sincronizar_episodios(_analisis(infracciones=[_infraccion(track_id=7)]))
         self.assertEqual(len(p._abiertas), 1)
 
-        # La persona desaparece del encuadre (sin personas, sin infracciones).
         for _ in range(10):
             p._sincronizar_episodios(_analisis(infracciones=[], personas=[]))
         self.assertEqual(p.cliente.resueltas, [], "salir de cámara no cierra la alerta")
@@ -199,7 +172,6 @@ class TestDesaparicionDeTrack(unittest.TestCase):
 
 
 class TestFiltradoDeAnomalias(unittest.TestCase):
-    """Las anomalías de movimiento no entran al tracker de episodios de EPP."""
 
     def test_anomalia_no_abre_episodio_epp(self):
         p = _pipeline(frames_abrir=2)
@@ -222,7 +194,6 @@ class TestFiltradoDeAnomalias(unittest.TestCase):
 
 
 class TestReportesEnSegundoPlano(unittest.TestCase):
-    """En vivo las altas van a un hilo aparte para no congelar el video."""
 
     def _con_fondo(self, cliente):
         p = _pipeline(frames_abrir=1, frames_cerrar=1)
@@ -232,8 +203,8 @@ class TestReportesEnSegundoPlano(unittest.TestCase):
 
     def test_el_cierre_usa_el_id_de_su_apertura(self):
         p = self._con_fondo(_ClienteFalso(falta_id_base=555))
-        p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))  # abre
-        p._sincronizar_episodios(_analisis(infracciones=[]))               # cierra
+        p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
+        p._sincronizar_episodios(_analisis(infracciones=[]))
         p._fondo.shutdown(wait=True)
         self.assertEqual([r[0] for r in p.cliente.resueltas], [555])
         self.assertEqual(p._abiertas, {})
@@ -250,7 +221,7 @@ class TestReportesEnSegundoPlano(unittest.TestCase):
         inicio = time.monotonic()
         p._sincronizar_episodios(_analisis(infracciones=[_infraccion()]))
         self.assertLess(time.monotonic() - inicio, 0.5)
-        self.assertEqual(len(p._abiertas), 1)  # ya cuenta como abierta: no se duplica
+        self.assertEqual(len(p._abiertas), 1)
         liberar.set()
         p._fondo.shutdown(wait=True)
         self.assertEqual(len(p.cliente.infracciones_abiertas), 1)

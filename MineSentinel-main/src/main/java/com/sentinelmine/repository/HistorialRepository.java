@@ -13,15 +13,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * Consulta unificada del historial de alertas.
- *
- * <p>Las faltas de EPP y las anomalías viven en tablas distintas con claves
- * primarias independientes. Unirlas en memoria y ordenar por {@code id} producía
- * un orden incorrecto y limitaba el histórico a las últimas 50 filas de cada
- * tabla. Esta implementación hace el UNION ALL en PostgreSQL, filtra y pagina
- * antes de traer los datos a la aplicación.</p>
- */
 @Repository
 public class HistorialRepository {
 

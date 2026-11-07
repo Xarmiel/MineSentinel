@@ -10,22 +10,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * Servicio de generación y exportación de reportes de seguridad y auditoría minera.
- * Soporta exportación en CSV (compatible con Microsoft Excel) y generación de Actas Oficiales de Cierre de Guardia.
- */
 @Service
 public class ReporteExportService {
 
     private static final DateTimeFormatter FORMATO_FECHA_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /**
-     * Genera un archivo CSV con el historial de alertas e infracciones registradas.
-     * El resultado corresponde exactamente a los filtros aplicados en la vista.
-     */
     public byte[] generarCsvHistorialAlertas(List<AlertaViewDTO> alertas) {
         StringBuilder sb = new StringBuilder();
-        // BOM UTF-8 para apertura correcta en Microsoft Excel
         sb.append('\ufeff');
         sb.append("ID;Tipo;Titulo;Fecha_Hora;Hora;Descripcion;Trabajador;Track;Rol;Prioridad;Estado;Notificado_Jefe_Turno;Confianza;Turno;Snapshot_URL\n");
 
@@ -58,9 +49,6 @@ public class ReporteExportService {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    /**
-     * Genera un archivo CSV con el detalle de movimientos de aforo (Event Ledger).
-     */
     public byte[] generarCsvMovimientosAforo(List<MovimientoAforo> movimientos) {
         StringBuilder sb = new StringBuilder();
         sb.append('\ufeff');
@@ -86,9 +74,6 @@ public class ReporteExportService {
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
-    /**
-     * Genera el HTML formateado para la impresión / guardado en PDF del Acta Oficial de Cierre de Guardia.
-     */
     public String generarActaCierreTurnoHtml(CierreAuditoriaTurno auditoria, EventoTurno evento) {
         String nombreTurno = evento.getTurno() != null ? evento.getTurno().getNombre() : "Turno Operativo";
         String inicio = evento.getFechaInicio() != null ? evento.getFechaInicio().format(FORMATO_FECHA_HORA) : "N/A";
@@ -206,7 +191,6 @@ public class ReporteExportService {
     private String escaparCsv(String valor) {
         if (valor == null) return "";
         String res = valor.replace("\"", "\"\"");
-        // Evita que Excel interprete como fórmula un texto que empieza por =, +, - o @.
         if (!res.isEmpty()) {
             char primero = res.charAt(0);
             if (primero == '=' || primero == '+' || primero == '-' || primero == '@'

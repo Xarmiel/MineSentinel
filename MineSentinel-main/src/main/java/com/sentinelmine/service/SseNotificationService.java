@@ -9,22 +9,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Servicio de notificaciones en tiempo real basado en Server-Sent Events (SSE).
- * Permite la transmisión instantánea (<50ms) de actualizaciones de aforo,
- * nuevas infracciones de EPP y cambios en el estado operativo de los turnos.
- */
 @Service
 public class SseNotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(SseNotificationService.class);
-    private static final Long SSE_TIMEOUT = 30 * 60 * 1000L; // 30 minutos
+    private static final Long SSE_TIMEOUT = 30 * 60 * 1000L;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
-    /**
-     * Registra una nueva conexión SSE para un cliente conectado (Dashboard/Panel Admin).
-     */
     public SseEmitter registrarCliente() {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
@@ -47,7 +39,6 @@ public class SseNotificationService {
             log.debug("Error en conexión SSE (cliente desconectado): {}", e.getMessage());
         });
 
-        // Enviar evento inicial de bienvenida
         try {
             emitter.send(SseEmitter.event()
                     .name("INIT")
@@ -59,9 +50,6 @@ public class SseNotificationService {
         return emitter;
     }
 
-    /**
-     * Emite un evento en tiempo real a todos los clientes SSE conectados.
-     */
     public void emitirEvento(String nombreEvento, Object data) {
         if (emitters.isEmpty()) {
             return;
