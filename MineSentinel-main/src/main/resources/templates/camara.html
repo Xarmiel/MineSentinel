@@ -13,6 +13,8 @@
 
     <div class="camera-card">
         <img id="marcoMotor" class="camera-feed" alt="Video con deteccion de EPP del motor de vision">
+        <canvas id="lienzoLocal" class="camera-feed" hidden></canvas>
+        <video id="videoLocal" playsinline muted hidden></video>
         <canvas id="overlayCamara" class="camera-overlay"></canvas>
         <div class="camera-placeholder" id="placeholderCamara">
             <span class="camera-icon">📷</span>
@@ -20,6 +22,8 @@
         </div>
     </div>
     <p id="estadoDeteccion" class="small">Estado: sin señal del motor</p>
+    <button id="btnTransmitir" class="btn btn-primary btn-camara" type="button">Transmitir desde esta cámara</button>
+    <p class="small">La detección corre en este navegador con tu cámara; el resto de usuarios ve tu transmisión.</p>
 
     <div class="deteccion-panel">
         <h3>Cuadro de cumplimiento de EPP (YOLOv8 en vivo)</h3>
@@ -59,7 +63,11 @@
 
     </div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <script type="module">
+    import { MotorNavegador } from '/js/vision-navegador.js';
+
     const ETIQUETA = {
         CONFORME: 'CONFORME',
         INTERMEDIO: 'INTERMEDIO',
@@ -328,6 +336,7 @@
     marcoMotor.addEventListener('error', () => mostrarPlaceholder('Motor de vision sin senal'));
 
     async function comprobarSenal() {
+        if (motorLocal.activo) return;
         try {
             const res = await fetch('/api/v1/vision/estado', { cache: 'no-store' });
             const estado = res.ok ? await res.json() : null;
@@ -342,6 +351,45 @@
             mostrarPlaceholder('Motor de vision sin senal');
         }
     }
+
+    const lienzoLocal = document.getElementById('lienzoLocal');
+    const btnTransmitir = document.getElementById('btnTransmitir');
+    const motorLocal = new MotorNavegador({
+        video: document.getElementById('videoLocal'),
+        lienzo: lienzoLocal,
+        onEstado: setEstado
+    });
+
+    btnTransmitir.addEventListener('click', async () => {
+        if (motorLocal.activo) {
+            motorLocal.detener();
+            lienzoLocal.hidden = true;
+            btnTransmitir.textContent = 'Transmitir desde esta cámara';
+            comprobarSenal();
+            return;
+        }
+        try {
+            const estado = await fetch('/api/v1/vision/estado', { cache: 'no-store' }).then(r => r.json()).catch(() => null);
+            const ms = estado ? estado.msDesdeUltimoFrameStream : -1;
+            // Hay un solo canal de video: dos emisores a la vez mezclarían sus imágenes.
+            if (ms >= 0 && ms < SIN_SENAL_MS && !confirm('Otra cámara ya está transmitiendo. ¿Reemplazarla por la tuya?')) return;
+            btnTransmitir.disabled = true;
+            await motorLocal.iniciar();
+            marcoMotor.removeAttribute('src');
+            marcoMotor.style.display = 'none';
+            placeholderCamara.style.display = 'none';
+            hayFrame = false;
+            limpiarOverlay();
+            lienzoLocal.hidden = false;
+            btnTransmitir.textContent = 'Detener transmisión';
+        } catch (err) {
+            console.error(err);
+            motorLocal.detener();
+            setEstado('No se pudo iniciar la cámara: ' + (err.message || err));
+        } finally {
+            btnTransmitir.disabled = false;
+        }
+    });
 
     comprobarSenal();
     setInterval(comprobarSenal, 1000);

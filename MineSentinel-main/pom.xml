@@ -63,6 +63,19 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- El motor de visión del navegador lee la misma configuración que el cliente Python -->
+            <resource>
+                <directory>python_client</directory>
+                <includes>
+                    <include>epp_config.yaml</include>
+                </includes>
+                <targetPath>static/js/vision</targetPath>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -263,13 +263,19 @@ class MineSentinelClient:
             yield struct.pack(">I", len(jpeg)) + jpeg
 
     def _bucle_stream(self) -> None:
-        while True:
+        # Un POST corto por frame: los proxies en la nube (Railway) retienen un upload chunked
+        # infinito y el backend nunca recibe nada. El servidor lee hasta EOF, así que acepta 1 frame.
+        sesion = requests.Session()
+        headers = {"Content-Type": "application/octet-stream", **API_KEY_HEADERS}
+        for trozo in self._frames_stream():
             try:
-                requests.post(f"{self.base_url}/api/v1/vision/stream", data=self._frames_stream(),
-                              headers={"Content-Type": "application/octet-stream", **API_KEY_HEADERS}, timeout=(5, None))
+                res = sesion.post(f"{self.base_url}/api/v1/vision/stream", data=trozo, headers=headers, timeout=5)
+                if res.status_code >= 400:
+                    logger.warning("Stream de video rechazado: %s - %s", res.status_code, res.text[:200])
+                    time.sleep(1)
             except Exception as e:
                 logger.warning("Stream de video cortado (%s); reintentando", e)
-            time.sleep(1)
+                time.sleep(1)
 
     def enviar_falta_epp(self, epp_id: int, rol_id: int, confianza: float, snapshot_url: str) -> bool:
         return self.enviar_infraccion(epp_id, rol_id, confianza, snapshot_url, "FALTANTE", "")
