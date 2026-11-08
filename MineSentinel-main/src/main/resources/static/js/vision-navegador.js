@@ -7,6 +7,8 @@ const BASE = '/js/vision/';
 const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 // Nombres de clase fijos de los .onnx exportados (ver python_client: model.names).
 // Si se reentrena el modelo de EPP hay que reexportarlo y actualizar esta lista.
+// Los .onnx del navegador se exportan a 416 px (no a epp_config.imgsz=640): ~4x menos cómputo que 640.
+const IMGSZ = 416;
 const MODELO_PERSONAS = { archivo: 'yolov8n.onnx', clasePersona: 0 };
 const MODELO_EPP = { archivo: 'best_sentinel_v2.onnx', nombres: ['gloves', 'goggles', 'helmet', 'vest'] };
 
@@ -17,7 +19,9 @@ const COLOR_CUADRO = { CONFORME: '#00c800', INTERMEDIO: '#ffa500', CRITICO: '#eb
 const COLOR_ELEMENTO = { CONFORME: '#22c55e', AUSENTE: '#ef4444', IMPOSTOR: '#f97316' };
 const ROL_ID = 1;          // igual que --rol por defecto del cliente Python
 const LINEA = 0.5;         // igual que --linea por defecto
-const STREAM_MS = 120;     // ~8 fps de video publicado
+const DIBUJO_MS = 30;      // ~33 fps de dibujado local
+const STREAM_MS = 50;      // hasta ~20 fps de video publicado
+const STREAM_EN_VUELO = 6; // POSTs simultáneos: cada uno tarda ~0.5 s ida y vuelta a Railway; con 1 topaba en ~2-8 fps
 
 const normalizar = c => String(c).trim().toLowerCase().replace(/[\s-]+/g, '_').replace(/^_+|_+$/g, '');
 
@@ -364,7 +368,13 @@ export class MotorNavegador {
         const cfg = jsyaml.load(await (await fetch(BASE + 'epp_config.yaml')).text());
         this.reglas = new ReglasEPP(cfg);
         ort.env.wasm.wasmPaths = ORT_DIST;
-        const proveedores = navigator.gpu ? ['webgpu', 'wasm'] : ['wasm'];
+        // navigator.gpu puede existir sin adaptador (p. ej. Opera GX en Linux); sin GPU, WASM va en un
+        // Web Worker (proxy) para no congelar la página. El proxy no admite WebGPU.
+        const adaptador = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
+        ort.env.wasm.proxy = !adaptador;
+        // Hilos WASM (solo con crossOriginIsolated, ver CamaraController); ort por defecto se queda en 4.
+        ort.env.wasm.numThreads = Math.min(8, Math.ceil((navigator.hardwareConcurrency || 4) / 2));
+        const proveedores = adaptador ? ['webgpu', 'wasm'] : ['wasm'];
         const crear = archivo => ort.InferenceSession.create(BASE + archivo, { executionProviders: proveedores });
         [this.sesionPersonas, this.sesionEpp] = await Promise.all([crear(MODELO_PERSONAS.archivo), crear(MODELO_EPP.archivo)]);
 
@@ -396,12 +406,16 @@ export class MotorNavegador {
         this.analisis = null;
         this.fotograma = 0;
         this.fps = 0;
-        this.enviandoFrame = false;
+        this.framesEnVuelo = 0;
+        this.ultimoDibujo = 0;
         this.ultimoEnvio = 0;
+        this.personas = [];
+        this.elementos = [];
+        this.turnoEpp = false;
         this.activo = true;
 
         this.entrada = document.createElement('canvas');
-        this.entrada.width = this.entrada.height = this.reglas.imgsz;
+        this.entrada.width = this.entrada.height = IMGSZ;
         this.salida = document.createElement('canvas');
 
         this.bucleVideo();
@@ -418,7 +432,7 @@ export class MotorNavegador {
 
     // Letterbox gris como Ultralytics; devuelve el tensor y la transformación inversa.
     preprocesar() {
-        const s = this.reglas.imgsz, w = this.video.videoWidth, h = this.video.videoHeight;
+        const s = IMGSZ, w = this.video.videoWidth, h = this.video.videoHeight;
         const k = Math.min(s / w, s / h), nw = Math.round(w * k), nh = Math.round(h * k);
         const dx = Math.floor((s - nw) / 2), dy = Math.floor((s - nh) / 2);
         const ctx = this.entrada.getContext('2d', { willReadFrequently: true });
@@ -435,16 +449,23 @@ export class MotorNavegador {
         return { tensor: new ort.Tensor('float32', datos, [1, 3, s, s]), lb: { k, dx, dy } };
     }
 
+    // Un modelo por ciclo, alternando personas / EPP: cada análisis cuesta la mitad y combina la
+    // salida fresca de uno con la última del otro (unos 45 ms de diferencia, despreciable).
     async inferir() {
         const { tensor, lb } = this.preprocesar();
         const r = this.reglas;
-        const salidaP = await this.sesionPersonas.run({ [this.sesionPersonas.inputNames[0]]: tensor });
-        const salidaE = await this.sesionEpp.run({ [this.sesionEpp.inputNames[0]]: tensor });
-        const personas = decodificar(salidaP[this.sesionPersonas.outputNames[0]], 0.30, r.iouUmbral, lb, MODELO_PERSONAS.clasePersona);
-        const elementos = decodificar(salidaE[this.sesionEpp.outputNames[0]], r.confianza, r.iouUmbral, lb)
-            .map(d => ({ ...r.clasificar(MODELO_EPP.nombres[d.clase] ?? d.clase), caja: d.caja, confianza: d.conf }))
-            .filter(d => d.estado !== 'OTRO');
-        return { personas: this.tracker.actualizar(personas), elementos };
+        this.turnoEpp = !this.turnoEpp;
+        if (this.turnoEpp) {
+            const salida = await this.sesionEpp.run({ [this.sesionEpp.inputNames[0]]: tensor });
+            this.elementos = decodificar(salida[this.sesionEpp.outputNames[0]], r.confianza, r.iouUmbral, lb)
+                .map(d => ({ ...r.clasificar(MODELO_EPP.nombres[d.clase] ?? d.clase), caja: d.caja, confianza: d.conf }))
+                .filter(d => d.estado !== 'OTRO');
+        } else {
+            const salida = await this.sesionPersonas.run({ [this.sesionPersonas.inputNames[0]]: tensor });
+            this.personas = this.tracker.actualizar(
+                decodificar(salida[this.sesionPersonas.outputNames[0]], 0.30, r.iouUmbral, lb, MODELO_PERSONAS.clasePersona));
+        }
+        return { personas: this.personas, elementos: this.elementos };
     }
 
     async bucleIA() {
@@ -477,14 +498,16 @@ export class MotorNavegador {
 
     bucleVideo() {
         if (!this.activo) return;
-        const w = this.video.videoWidth, h = this.video.videoHeight;
-        if (w && h) {
+        const w = this.video.videoWidth, h = this.video.videoHeight, ahora = performance.now();
+        // La cámara da ~30 fps: en pantallas de 120-144 Hz redibujar en cada rAF solo le quita CPU a la IA.
+        if (w && h && ahora - this.ultimoDibujo >= DIBUJO_MS) {
+            this.ultimoDibujo = ahora;
             if (this.lienzo.width !== w || this.lienzo.height !== h) { this.lienzo.width = w; this.lienzo.height = h; }
             const ctx = this.lienzo.getContext('2d');
             ctx.drawImage(this.video, 0, 0, w, h);
             this.anotar(ctx, w, h);
-            this.publicarFrame(w, h);
         }
+        if (w && h) this.publicarFrame(w, h); // ritmo propio (STREAM_MS), no atado al dibujado
         requestAnimationFrame(() => this.bucleVideo());
     }
 
@@ -536,8 +559,9 @@ export class MotorNavegador {
     // Un POST por frame a /vision/stream (el servidor lee hasta EOF), como el cliente Python.
     async publicarFrame(w, h) {
         const ahora = performance.now();
-        if (this.enviandoFrame || ahora - this.ultimoEnvio < STREAM_MS) return;
-        this.enviandoFrame = true;
+        // shortcut: con varios POSTs en vuelo un frame viejo puede llegar después de uno nuevo (salto mínimo).
+        if (this.framesEnVuelo >= STREAM_EN_VUELO || ahora - this.ultimoEnvio < STREAM_MS) return;
+        this.framesEnVuelo++;
         this.ultimoEnvio = ahora;
         try {
             const k = Math.min(1, this.reglas.anchoMaximo / w);
@@ -552,7 +576,7 @@ export class MotorNavegador {
         } catch (e) {
             console.warn('[vision] no se pudo publicar el frame', e);
         } finally {
-            this.enviandoFrame = false;
+            this.framesEnVuelo--;
         }
     }
 

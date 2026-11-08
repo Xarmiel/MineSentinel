@@ -218,6 +218,7 @@
     const placeholderCamara = document.getElementById('placeholderCamara');
     const overlay = document.getElementById('overlayCamara');
     let hayFrame = false;
+    let errorLocal = null; // si falla la cámara local, que el chequeo periódico no borre el motivo
 
     function limpiarOverlay() {
         if (!overlay) return;
@@ -315,7 +316,7 @@
         limpiarOverlay();
         placeholderCamara.style.display = 'flex';
         textoCamara.textContent = mensaje;
-        setEstado('Estado: sin senal del motor');
+        setEstado(errorLocal || 'Estado: sin senal del motor');
     }
 
     function ocultarPlaceholder() {
@@ -336,10 +337,11 @@
     marcoMotor.addEventListener('error', () => mostrarPlaceholder('Motor de vision sin senal'));
 
     async function comprobarSenal() {
-        if (motorLocal.activo) return;
+        if (motorLocal.activo || btnTransmitir.disabled) return; // transmitiendo o cargando modelos
         try {
             const res = await fetch('/api/v1/vision/estado', { cache: 'no-store' });
             const estado = res.ok ? await res.json() : null;
+            if (motorLocal.activo || btnTransmitir.disabled) return; // la cámara local arrancó durante la espera
             const ms = estado ? estado.msDesdeUltimoFrameStream : -1;
             if (ms >= 0 && ms < SIN_SENAL_MS) {
                 conectarStream();
@@ -373,6 +375,7 @@
             const ms = estado ? estado.msDesdeUltimoFrameStream : -1;
             // Hay un solo canal de video: dos emisores a la vez mezclarían sus imágenes.
             if (ms >= 0 && ms < SIN_SENAL_MS && !confirm('Otra cámara ya está transmitiendo. ¿Reemplazarla por la tuya?')) return;
+            errorLocal = null;
             btnTransmitir.disabled = true;
             await motorLocal.iniciar();
             marcoMotor.removeAttribute('src');
@@ -385,7 +388,8 @@
         } catch (err) {
             console.error(err);
             motorLocal.detener();
-            setEstado('No se pudo iniciar la cámara: ' + (err.message || err));
+            errorLocal = 'No se pudo iniciar la cámara: ' + (err.message || err);
+            setEstado(errorLocal);
         } finally {
             btnTransmitir.disabled = false;
         }
