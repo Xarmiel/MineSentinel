@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout del repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar JDK 17 (Temurin)
         uses: actions/setup-java@v4
