@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    name: Build y pruebas (Spring Boot 3.3.4 / Java 17 + Python)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: MineSentinel-main/pom.xml
+
+      - name: Instalar dependencias Maven
+        working-directory: ./MineSentinel-main
+        run: mvn -B -q dependency:go-offline
+
+      - name: Compilar y ejecutar pruebas unitarias (JUnit)
+        working-directory: ./MineSentinel-main
+        run: mvn -B test
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: MineSentinel-main/python_client/requirements.txt
+
+      - name: Instalar dependencias Python
+        working-directory: ./MineSentinel-main/python_client
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ejecutar pruebas unitarias del cliente Python
+        working-directory: ./MineSentinel-main/python_client
+        run: python -m unittest tests.test_reglas_epp tests.test_ciclo_vida_epp tests.test_publicador_frames -v
