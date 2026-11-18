@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /MineSentinel-main
+    schedule:
+      interval: weekly
+  - package-ecosystem: pip
+    directory: /MineSentinel-main/python_client
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /MineSentinel-main
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

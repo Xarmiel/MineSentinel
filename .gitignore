@@ -17,6 +17,10 @@ target/
 *.mp4
 uploads/
 
+/MineSentinel-main/node_modules/
+/MineSentinel-main/test-results/
+/MineSentinel-main/playwright-report/
+
 # Mantenimiento: credenciales locales y logs de cron
 **/scripts/minesentinel.env
 **/logs/

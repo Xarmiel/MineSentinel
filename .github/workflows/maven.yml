@@ -60,3 +60,31 @@ jobs:
         run: |
           node --test src/test/js/vision-navegador.test.mjs
           node src/test/js/prueba-camara.mjs
+
+  test-browser:
+    name: Pruebas E2E (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./MineSentinel-main
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          cache-dependency-path: MineSentinel-main/pom.xml
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: MineSentinel-main/package-lock.json
+      - name: Instalar Playwright
+        run: npm ci
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e
