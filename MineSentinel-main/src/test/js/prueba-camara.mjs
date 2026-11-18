@@ -37,10 +37,15 @@ if (!coincidencia) {
     console.error('No se encontró el <script type="module"> en ' + plantilla);
     process.exit(1);
 }
+const visionNavegador = join(aqui, '..', '..', 'main', 'resources', 'static', 'js', 'vision-navegador.js');
+const moduloPlantilla = coincidencia[1].replace(
+    "from '/js/vision-navegador.js'",
+    `from '${pathToFileURL(visionNavegador).href}'`
+);
 const dir = mkdtempSync(join(tmpdir(), 'camara-'));
 const modulo = join(dir, 'camara.mjs');
 writeFileSync(modulo,
-    coincidencia[1] +
+    moduloPlantilla +
     '\nexport { pintarCuadro, pintarOverlay, limpiarOverlay, escalaCajas,' +
     ' ordenarPorGravedad, estadoDe, comprobarSenal };\n', 'utf8');
 
@@ -78,7 +83,8 @@ function crearElemento(id) {
 
 const elementos = {};
 for (const id of ['marcoMotor', 'overlayCamara', 'placeholderCamara', 'textoCamara',
-    'estadoDeteccion', 'cuadroCuerpo', 'cuadroEstado', 'avisoMotor']) {
+    'estadoDeteccion', 'cuadroCuerpo', 'cuadroEstado', 'avisoMotor',
+    'lienzoLocal', 'btnTransmitir', 'videoLocal']) {
     elementos[id] = crearElemento(id);
 }
 

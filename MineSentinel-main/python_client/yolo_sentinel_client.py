@@ -357,6 +357,44 @@ class MineSentinelClient:
                 time.sleep(2)
 
 
+class PublicadorFrames:
+    def __init__(self, cliente):
+            self.cliente = cliente
+            self._condicion = threading.Condition()
+            self._pendiente = None
+            self._cerrado = False
+            self._hilo = threading.Thread(
+                target=self._bucle,
+                name="publicador-frames",
+                daemon=True,
+            )
+            self._hilo.start()
+
+    def publicar(self, jpeg: bytes) -> None:
+            with self._condicion:
+                if self._cerrado:
+                    return
+                self._pendiente = jpeg
+                self._condicion.notify()
+
+    def _bucle(self) -> None:
+            while True:
+                with self._condicion:
+                    while self._pendiente is None and not self._cerrado:
+                        self._condicion.wait()
+                    if self._pendiente is None:
+                        return
+                    jpeg = self._pendiente
+                    self._pendiente = None
+                self.cliente.enviar_frame(jpeg)
+
+    def cerrar(self) -> None:
+            with self._condicion:
+                self._cerrado = True
+                self._condicion.notify()
+            self._hilo.join(timeout=5)
+
+
 class PipelineEPP:
 
     LADO_ARRIBA = "ARRIBA"

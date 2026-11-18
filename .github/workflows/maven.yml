@@ -1,4 +1,4 @@
-name: Pruebas MineSentinel (Java y Python)
+name: Pruebas MineSentinel (Java, Python y JavaScript)
 
 on:
   push:
@@ -10,6 +10,9 @@ jobs:
   test-java:
     name: Pruebas Java (Maven)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./MineSentinel-main
     steps:
       - uses: actions/checkout@v4
       - name: Configurar JDK 17
@@ -18,15 +21,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
+          cache-dependency-path: MineSentinel-main/pom.xml
       - name: Ejecutar pruebas con Maven
-        run: mvn -B test --file pom.xml
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test
 
   test-python:
     name: Pruebas Python (python_client)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./python_client
+        working-directory: ./MineSentinel-main/python_client
     steps:
       - uses: actions/checkout@v4
       - name: Configurar Python
@@ -38,4 +44,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pytest
+          python -m pytest tests -q
+
+  test-javascript:
+    name: Pruebas JavaScript
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./MineSentinel-main
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ejecutar pruebas JavaScript
+        run: |
+          node --test src/test/js/vision-navegador.test.mjs
+          node src/test/js/prueba-camara.mjs

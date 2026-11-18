@@ -1,4 +1,4 @@
-# 🛡️ MineSentinel — Sistema Integral de Seguridad y Control de Aforo Minero
+/# 🛡️ MineSentinel — Sistema Integral de Seguridad y Control de Aforo Minero
 
 MineSentinel es una plataforma industrial backend y frontend construida con **Java 17**, **Spring Boot 3.3.4**, **Spring Data JPA**, **PostgreSQL** y **Thymeleaf**, diseñada para la supervisión y control de aforo, gestión de turnos concurrentes e ingesta en tiempo real de eventos de visión artificial (**YOLOv8 + ByteTrack**).
 
