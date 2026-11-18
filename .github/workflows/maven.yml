@@ -1,0 +1,41 @@
+name: Pruebas MineSentinel (Java y Python)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-java:
+    name: Pruebas Java (Maven)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      - name: Ejecutar pruebas con Maven
+        run: mvn -B test --file pom.xml
+
+  test-python:
+    name: Pruebas Python (python_client)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./python_client
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias y ejecutar pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pytest
