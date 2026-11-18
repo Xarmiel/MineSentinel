@@ -5,10 +5,8 @@ import com.sentinelmine.entity.ConfiguracionAforo;
 import com.sentinelmine.entity.EventoTurno;
 import com.sentinelmine.entity.MovimientoAforo;
 import com.sentinelmine.entity.RolPersonal;
-import com.sentinelmine.entity.enums.EstadoTurno;
 import com.sentinelmine.entity.enums.TipoMovimiento;
 import com.sentinelmine.repository.ConfiguracionAforoRepository;
-import com.sentinelmine.repository.EventoTurnoRepository;
 import com.sentinelmine.repository.MovimientoAforoRepository;
 import com.sentinelmine.repository.RolPersonalRepository;
 import jakarta.annotation.PostConstruct;
@@ -30,7 +28,6 @@ public class AforoService {
     private static final Logger log = LoggerFactory.getLogger(AforoService.class);
 
     private final MovimientoAforoRepository movimientoAforoRepository;
-    private final EventoTurnoRepository eventoTurnoRepository;
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
 
@@ -45,12 +42,10 @@ public class AforoService {
     private volatile String ultimoEvento = "20:18:11 - Ingreso bloqueado — Trabajador #16, EPP incompleto";
 
     public AforoService(MovimientoAforoRepository movimientoAforoRepository,
-                        EventoTurnoRepository eventoTurnoRepository,
                         RolPersonalRepository rolPersonalRepository,
                         EventoTurnoService eventoTurnoService,
                         ConfiguracionAforoRepository configuracionAforoRepository) {
         this.movimientoAforoRepository = movimientoAforoRepository;
-        this.eventoTurnoRepository = eventoTurnoRepository;
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
         this.configuracionAforoRepository = configuracionAforoRepository;

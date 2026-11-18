@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null") // Mockito matchers use null placeholders, not runtime arguments.
 class EventoTurnoServiceTest {
 
     @Mock

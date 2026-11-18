@@ -34,7 +34,6 @@ public class SeguridadInfraccionService {
     private final RolPersonalRepository rolPersonalRepository;
     private final EventoTurnoService eventoTurnoService;
     private final SseNotificationService sseNotificationService;
-    private final NotificacionExternaService notificacionExternaService;
     private final MovimientoAforoRepository movimientoAforoRepository;
 
     public SeguridadInfraccionService(FaltaEPPRepository faltaEPPRepository,
@@ -45,7 +44,6 @@ public class SeguridadInfraccionService {
                                      RolPersonalRepository rolPersonalRepository,
                                      EventoTurnoService eventoTurnoService,
                                      SseNotificationService sseNotificationService,
-                                     NotificacionExternaService notificacionExternaService,
                                      MovimientoAforoRepository movimientoAforoRepository) {
         this.faltaEPPRepository = faltaEPPRepository;
         this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
@@ -55,7 +53,6 @@ public class SeguridadInfraccionService {
         this.rolPersonalRepository = rolPersonalRepository;
         this.eventoTurnoService = eventoTurnoService;
         this.sseNotificationService = sseNotificationService;
-        this.notificacionExternaService = notificacionExternaService;
         this.movimientoAforoRepository = movimientoAforoRepository;
     }
 

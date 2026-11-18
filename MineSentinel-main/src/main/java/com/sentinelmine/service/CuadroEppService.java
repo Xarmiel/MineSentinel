@@ -4,6 +4,7 @@ import com.sentinelmine.dto.request.CuadroEPPRequestDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -56,7 +57,7 @@ public class CuadroEppService {
         return Instant.now().getEpochSecond() - publicado.get().getEpochSecond() > expiracionSegundos;
     }
 
-    private Map<String, Object> envolver(CuadroEPPRequestDTO cuadro, Instant instante) {
+    private @NonNull Map<String, Object> envolver(@NonNull CuadroEPPRequestDTO cuadro, Instant instante) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("rolId", cuadro.getRolId());
         payload.put("nombreRol", cuadro.getNombreRol());

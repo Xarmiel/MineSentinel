@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AuthInterceptorTest {
@@ -13,9 +15,9 @@ class AuthInterceptorTest {
     private int pedirApi(AuthInterceptor i, String clave, boolean conSesion) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/aforo/movimiento");
         if (clave != null) request.addHeader(AuthInterceptor.HEADER_API_KEY, clave);
-        if (conSesion) request.getSession(true).setAttribute("usuario", "u");
+        if (conSesion) Objects.requireNonNull(request.getSession(true)).setAttribute("usuario", "u");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        i.preHandle(request, response, null);
+        i.preHandle(request, response, new Object());
         return response.getStatus();
     }
 
@@ -37,11 +39,12 @@ class AuthInterceptorTest {
     private MockHttpServletResponse pedir(String uri, String rol) throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", uri);
         if (rol != null) {
-            request.getSession(true).setAttribute("usuario", "u");
-            request.getSession().setAttribute("rol", rol);
+            var session = Objects.requireNonNull(request.getSession(true));
+            session.setAttribute("usuario", "u");
+            session.setAttribute("rol", rol);
         }
         MockHttpServletResponse response = new MockHttpServletResponse();
-        boolean pasa = interceptor.preHandle(request, response, null);
+        boolean pasa = interceptor.preHandle(request, response, new Object());
         assertEquals(pasa, response.getRedirectedUrl() == null);
         return response;
     }

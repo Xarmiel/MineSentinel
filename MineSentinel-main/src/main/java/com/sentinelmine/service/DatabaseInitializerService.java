@@ -5,12 +5,12 @@ import com.sentinelmine.entity.*;
 import com.sentinelmine.entity.enums.EstadoAlerta;
 import com.sentinelmine.entity.enums.EstadoTurno;
 import com.sentinelmine.entity.enums.TipoCatalogoEPP;
-import com.sentinelmine.entity.enums.TipoMovimiento;
 import com.sentinelmine.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.lang.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,9 +31,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
     private final CatalogoEPPRepository catalogoEPPRepository;
     private final CatalogoAnomaliasRepository catalogoAnomaliasRepository;
     private final EventoTurnoRepository eventoTurnoRepository;
-    private final MovimientoAforoRepository movimientoAforoRepository;
     private final FaltaEPPRepository faltaEPPRepository;
-    private final AnomaliaMovimientoRepository anomaliaMovimientoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -48,9 +46,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
                                       CatalogoEPPRepository catalogoEPPRepository,
                                       CatalogoAnomaliasRepository catalogoAnomaliasRepository,
                                       EventoTurnoRepository eventoTurnoRepository,
-                                      MovimientoAforoRepository movimientoAforoRepository,
                                       FaltaEPPRepository faltaEPPRepository,
-                                      AnomaliaMovimientoRepository anomaliaMovimientoRepository,
                                       UsuarioRepository usuarioRepository,
                                       PasswordEncoder passwordEncoder) {
         this.rolPersonalRepository = rolPersonalRepository;
@@ -58,9 +54,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
         this.catalogoEPPRepository = catalogoEPPRepository;
         this.catalogoAnomaliasRepository = catalogoAnomaliasRepository;
         this.eventoTurnoRepository = eventoTurnoRepository;
-        this.movimientoAforoRepository = movimientoAforoRepository;
         this.faltaEPPRepository = faltaEPPRepository;
-        this.anomaliaMovimientoRepository = anomaliaMovimientoRepository;
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -119,13 +113,7 @@ public class DatabaseInitializerService implements CommandLineRunner {
     private void inicializarSupervisor() {
         Optional<Usuario> supOpt = usuarioRepository.findByUsername("supervisor");
         if (supOpt.isEmpty()) {
-            usuarioRepository.save(new Usuario(
-                    "supervisor",
-                    passwordEncoder.encode(supervisorPassword.isEmpty() ? "supervisor123" : supervisorPassword),
-                    "Supervisor de Turno",
-                    AuthInterceptor.ROL_SUPERVISOR,
-                    true
-            ));
+            usuarioRepository.save(crearSupervisor());
             log.info("Usuario supervisor por defecto 'supervisor' creado exitosamente.");
         } else if (!supervisorPassword.isEmpty() && !passwordEncoder.matches(supervisorPassword, supOpt.get().getPassword())) {
             supOpt.get().setPassword(passwordEncoder.encode(supervisorPassword));
@@ -134,28 +122,46 @@ public class DatabaseInitializerService implements CommandLineRunner {
         }
     }
 
+    private @NonNull Usuario crearSupervisor() {
+        return new Usuario(
+                "supervisor",
+                passwordEncoder.encode(supervisorPassword.isEmpty() ? "supervisor123" : supervisorPassword),
+                "Supervisor de Turno",
+                AuthInterceptor.ROL_SUPERVISOR,
+                true
+        );
+    }
+
     private void inicializarRoles() {
         if (rolPersonalRepository.count() == 0) {
-            rolPersonalRepository.saveAll(List.of(
-                    new RolPersonal("Operador de Maquinaria / Perforista", "Amarillo", true),
-                    new RolPersonal("Supervisor de Seguridad / Ingeniero", "Blanco", true),
-                    new RolPersonal("Técnico Electricista / Mantenimiento", "Azul", true),
-                    new RolPersonal("Geólogo / Topógrafo", "Verde", true),
-                    new RolPersonal("Visitante Técnico / Auditor", "Rojo", true)
-            ));
+            rolPersonalRepository.saveAll(rolesIniciales());
             log.info("Roles de personal inicializados.");
         }
     }
 
+    private @NonNull List<RolPersonal> rolesIniciales() {
+        return List.of(
+                new RolPersonal("Operador de Maquinaria / Perforista", "Amarillo", true),
+                new RolPersonal("Supervisor de Seguridad / Ingeniero", "Blanco", true),
+                new RolPersonal("Técnico Electricista / Mantenimiento", "Azul", true),
+                new RolPersonal("Geólogo / Topógrafo", "Verde", true),
+                new RolPersonal("Visitante Técnico / Auditor", "Rojo", true)
+        );
+    }
+
     private void inicializarTurnos() {
         if (turnoRepository.count() == 0) {
-            turnoRepository.saveAll(List.of(
-                    new Turno("Turno A · Guardia Día (Mañana)", LocalTime.of(7, 0), LocalTime.of(15, 30)),
-                    new Turno("Turno B · Guardia Tarde", LocalTime.of(15, 0), LocalTime.of(23, 30)),
-                    new Turno("Turno C · Guardia Noche", LocalTime.of(23, 0), LocalTime.of(7, 30))
-            ));
+            turnoRepository.saveAll(turnosIniciales());
             log.info("Turnos base inicializados.");
         }
+    }
+
+    private @NonNull List<Turno> turnosIniciales() {
+        return List.of(
+                new Turno("Turno A · Guardia Día (Mañana)", LocalTime.of(7, 0), LocalTime.of(15, 30)),
+                new Turno("Turno B · Guardia Tarde", LocalTime.of(15, 0), LocalTime.of(23, 30)),
+                new Turno("Turno C · Guardia Noche", LocalTime.of(23, 0), LocalTime.of(7, 30))
+        );
     }
 
     private void inicializarCatalogoEPP() {
@@ -204,15 +210,19 @@ public class DatabaseInitializerService implements CommandLineRunner {
 
     private void inicializarCatalogoAnomalias() {
         if (catalogoAnomaliasRepository.count() == 0) {
-            catalogoAnomaliasRepository.saveAll(List.of(
-                    new CatalogoAnomalias("Cruce en Sentido Contrario al Flujo"),
-                    new CatalogoAnomalias("Aglomeración en Boca-Mina (> 5 personas)"),
-                    new CatalogoAnomalias("Ingreso sin Autorización de Guardia"),
-                    new CatalogoAnomalias("Tiempo Excesivo en Zona Crítica de Tránsito"),
-                    new CatalogoAnomalias("Detección de Caída o Postura Anómala")
-            ));
+            catalogoAnomaliasRepository.saveAll(anomaliasIniciales());
             log.info("Catálogo de Anomalías inicializado.");
         }
+    }
+
+    private @NonNull List<CatalogoAnomalias> anomaliasIniciales() {
+        return List.of(
+                new CatalogoAnomalias("Cruce en Sentido Contrario al Flujo"),
+                new CatalogoAnomalias("Aglomeración en Boca-Mina (> 5 personas)"),
+                new CatalogoAnomalias("Ingreso sin Autorización de Guardia"),
+                new CatalogoAnomalias("Tiempo Excesivo en Zona Crítica de Tránsito"),
+                new CatalogoAnomalias("Detección de Caída o Postura Anómala")
+        );
     }
 
     private void inicializarTurnosActivosYMovimientos() {

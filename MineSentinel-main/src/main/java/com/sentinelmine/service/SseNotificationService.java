@@ -2,6 +2,7 @@ package com.sentinelmine.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -13,7 +14,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class SseNotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(SseNotificationService.class);
-    private static final Long SSE_TIMEOUT = 30 * 60 * 1000L;
+    private static final long SSE_TIMEOUT = 30 * 60 * 1000L;
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
 
@@ -50,7 +51,7 @@ public class SseNotificationService {
         return emitter;
     }
 
-    public void emitirEvento(String nombreEvento, Object data) {
+    public void emitirEvento(@NonNull String nombreEvento, @NonNull Object data) {
         if (emitters.isEmpty()) {
             return;
         }

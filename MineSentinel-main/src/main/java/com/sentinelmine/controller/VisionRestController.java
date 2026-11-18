@@ -76,7 +76,7 @@ public class VisionRestController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_JPEG)
+                .contentType(MediaType.parseMediaType("image/jpeg"))
                 .cacheControl(CacheControl.noCache())
                 .body(jpeg);
     }

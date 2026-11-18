@@ -3,8 +3,6 @@ package com.sentinelmine.service;
 import com.sentinelmine.dto.AlertaViewDTO;
 import com.sentinelmine.dto.HistorialFiltro;
 import com.sentinelmine.dto.HistorialPagina;
-import com.sentinelmine.entity.AnomaliaMovimiento;
-import com.sentinelmine.entity.FaltaEPP;
 import com.sentinelmine.entity.enums.EstadoAlerta;
 import com.sentinelmine.repository.AnomaliaMovimientoRepository;
 import com.sentinelmine.repository.FaltaEPPRepository;

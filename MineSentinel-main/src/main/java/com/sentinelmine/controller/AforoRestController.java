@@ -21,6 +21,7 @@ import com.sentinelmine.service.SeguridadInfraccionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -72,7 +73,7 @@ public class AforoRestController {
 
     @PostMapping("/turnos/abrir")
     public ResponseEntity<EventoTurno> abrirTurno(
-            @RequestParam Long turnoId,
+            @RequestParam @NonNull Long turnoId,
             @RequestParam(required = false) LocalDateTime fechaInicio) {
         EventoTurno nuevoEvento = eventoTurnoService.abrirTurno(turnoId, fechaInicio);
         return ResponseEntity.status(HttpStatus.CREATED).body(nuevoEvento);

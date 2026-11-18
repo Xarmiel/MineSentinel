@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("null") // Mockito matchers use null placeholders, not runtime arguments.
 class SeguridadInfraccionServiceTest {
 
     @Mock

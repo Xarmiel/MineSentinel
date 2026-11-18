@@ -12,6 +12,7 @@ import com.sentinelmine.repository.MovimientoAforoRepository;
 import com.sentinelmine.repository.TurnoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +49,7 @@ public class EventoTurnoService {
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public EventoTurno abrirTurno(Long turnoId, LocalDateTime fechaInicio) {
+    public EventoTurno abrirTurno(@NonNull Long turnoId, LocalDateTime fechaInicio) {
         Turno turno = turnoRepository.findById(turnoId)
                 .orElseThrow(() -> new IllegalArgumentException("No se encontró el turno con ID: " + turnoId));
 
@@ -200,7 +201,7 @@ public class EventoTurnoService {
         }
         return turnoRepository.findAll().stream()
                 .min((a, b) -> Long.compare(a.getTurnoId(), b.getTurnoId()))
-                .map(Turno::getNombre)
+                .map((@NonNull Turno turno) -> turno.getNombre())
                 .orElse("Sin guardia activa");
     }
 
