@@ -16,16 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configurar JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
           cache-dependency-path: MineSentinel-main/pom.xml
       - name: Ejecutar pruebas con Maven
-        run: |
-          chmod +x mvnw
-          ./mvnw -B test
+        run: mvn -B test
 
   test-python:
     name: Pruebas Python (python_client)
